@@ -201,9 +201,15 @@ export default function VideoIntro({ videoSrc = '/hero-video.mp4' }) {
   const toggleMute = useCallback(() => {
     const v = videoMainRef.current;
     if (!v) return;
-    v.muted = !isMuted;
-    setIsMuted(!isMuted);
-    if (isMuted) setHintVisible(false);
+    const nextMuted = !v.muted;
+    v.muted = nextMuted;
+    v.defaultMuted = nextMuted;
+    v.volume = nextMuted ? 0 : 1;
+    if (!nextMuted) {
+      v.play().catch(() => {});
+      setHintVisible(false);
+    }
+    setIsMuted(nextMuted);
   }, [isMuted]);
 
   // Scroll to next section
@@ -283,7 +289,7 @@ export default function VideoIntro({ videoSrc = '/hero-video.mp4' }) {
         {/* Main video */}
         <div className={styles.videoMainWrap}>
           <video ref={videoMainRef} className={styles.videoMain}
-            src={videoSrc} autoPlay loop muted playsInline preload="auto" />
+            src={videoSrc} autoPlay loop muted={isMuted} playsInline preload="auto" />
         </div>
 
         {/* Sound hint */}
