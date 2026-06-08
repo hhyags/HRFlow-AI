@@ -16,7 +16,13 @@ Date: June 8, 2026
 | Live Firebase, Supabase Storage, and Gemini validation | Blocked: service credentials not supplied |
 | Vercel deployment and domain validation | Blocked: Vercel authentication/domain access not supplied |
 
-Overall launch completion: **70%**.
+Engineering completion: **100%**.
+
+Launch automation and documentation completion: **100%**.
+
+Live infrastructure and deployment execution: **0%**.
+
+Overall project launch completion: **75%**.
 
 This percentage separates implementation readiness from live cloud execution. The codebase
 is deployment-ready, but it is not yet safe to label the service ready for real users until
@@ -29,10 +35,14 @@ the blocked production steps are executed and recorded.
 - Unit, integration, API, RBAC, authentication, and route-guard tests: 56 passed
 - Coverage: 100% statements, 100% lines, 100% functions, 95.23% branches
 - Playwright desktop/mobile/authentication journeys: 4 passed
-- Next.js optimized production build: passed, 45 routes
+- Next.js optimized production build: passed, 48 routes
 - Production dependency audit: 0 known vulnerabilities
 - Changed-file credential scan: passed
 - Existing dashboard styling: unchanged
+- Favicon, SEO metadata, Open Graph image, robots, and sitemap: complete
+- GitHub quality workflow: configured
+- Vercel Web Analytics and Speed Insights: integrated
+- Production smoke and database validation scripts: complete
 
 ## Security Status
 
@@ -62,13 +72,29 @@ database credentials are configured.
 
 ## Remaining Blockers
 
-1. Configure all required environment variables in Firebase/Supabase/Vercel.
-2. Authenticate and link the Vercel CLI/project.
-3. Apply the Firebase identity migration to production PostgreSQL.
-4. Seed and validate production demo data.
-5. Enable Firebase as a Supabase third-party auth provider.
-6. Run protected deep health checks with real Firebase, Storage, Database, and Gemini services.
-7. Deploy to Vercel, attach DNS, issue SSL, and execute role-specific acceptance tests.
+### Credentials and accounts required
+
+- Firebase project Owner/Editor access
+- Firebase Web App configuration values
+- Firebase Admin service account client email and private key
+- Supabase production project Owner/Administrator access
+- Supabase project URL, anon key, service role key, pooled database URL, and direct database URL
+- Google AI Studio or Google Cloud Gemini API key with quota/billing access
+- Vercel account/team access or `VERCEL_TOKEN`, plus permission to create/link the project
+- Domain registrar access for `hrflowai.app` or the final selected domain
+- Resend API key and verified sender domain for production email
+- Error-monitoring provider webhook and alert-channel access
+
+### Manual actions required
+
+1. Create/configure Firebase providers, templates, and authorized domains.
+2. Create/configure Supabase, enable Firebase third-party auth, and create the private bucket.
+3. Add all secrets to Vercel Production and isolated Preview environments.
+4. Apply migrations, seed demo data, and run `npm run db:validate`.
+5. Link and deploy the Vercel project.
+6. Purchase/attach the selected domain, configure DNS, and wait for SSL issuance.
+7. Enable Vercel Analytics/Speed Insights and configure uptime/error alerts.
+8. Run `npm run production:smoke` and the role-specific acceptance checklist against production.
 
 ## Launch Decision
 

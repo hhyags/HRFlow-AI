@@ -117,6 +117,7 @@ The complete production handoff is under [`docs`](docs):
 - Security and monitoring guidance
 - Post-deployment validation checklist
 - Dated production validation report
+- Infrastructure, admin, user, API, architecture, and final launch guides
 
 Run `npm run production:check` with production-like environment variables before release.
 Deploy with `powershell -File scripts/deploy-vercel.ps1`.

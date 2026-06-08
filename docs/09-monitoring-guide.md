@@ -11,3 +11,7 @@ Set `ERROR_MONITORING_WEBHOOK` to an error collector. Application logs are struc
 - storage upload failures
 - cron execution and leave accrual outcomes
 - privileged actions in `audit_logs`
+
+Vercel Web Analytics and Speed Insights are mounted in the root layout. Enable both products
+in the Vercel project dashboard after the first deployment. Configure an external uptime
+monitor for `/api/health` and a secure scheduled monitor for `/api/health/deep`.

@@ -8,6 +8,7 @@ const publicEnv = {
   NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: 'project.firebasestorage.app',
   NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: 'sender',
   NEXT_PUBLIC_FIREBASE_APP_ID: 'app',
+  NEXT_PUBLIC_APP_URL: 'https://hrflowai.app',
   NEXT_PUBLIC_SUPABASE_URL: 'https://project.supabase.co',
   NEXT_PUBLIC_SUPABASE_ANON_KEY: 'anon',
 }
