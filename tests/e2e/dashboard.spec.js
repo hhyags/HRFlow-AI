@@ -26,3 +26,15 @@ test('mobile navigation opens without changing the design', async ({ page }) => 
   await page.getByRole('button', { name: 'Leave' }).click()
   await expect(page.getByRole('heading', { name: 'Leave management', exact: true })).toBeVisible()
 })
+
+test('Firebase authentication pages render and validate required fields', async ({ page }) => {
+  await page.goto('/login')
+  await expect(page.getByRole('heading', { name: 'Sign in to HRFlow' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Continue with Google' })).toBeVisible()
+  await page.getByRole('link', { name: 'Create an account' }).click()
+  await expect(page.getByRole('heading', { name: 'Create your account' })).toBeVisible()
+  await expect(page.getByLabel('Invitation code')).toBeVisible()
+  await page.getByRole('link', { name: 'Sign in' }).click()
+  await page.getByRole('link', { name: 'Forgot password?' }).click()
+  await expect(page.getByRole('heading', { name: 'Reset your password' })).toBeVisible()
+})

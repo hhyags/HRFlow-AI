@@ -95,7 +95,7 @@ model Organization {
   slug           String                 @unique
   createdAt      DateTime               @default(now()) @map("created_at")
   updatedAt      DateTime               @updatedAt @map("updated_at")
-  profiles       Profile[]
+  users          User[]
   departments    Department[]
   employees      Employee[]
   jobs           Job[]
@@ -117,13 +117,17 @@ model Organization {
   payrollItems   PayrollItem[]
   notifications  Notification[]
   reminders      ScheduledReminder[]
+  auditLogs      AuditLog[]
+  invitations    OrganizationInvite[]
 
   @@map("organizations")
 }
 
-model Profile {
-  id             String       @id @db.Uuid
+model User {
+  id             String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  firebaseUid    String       @unique @map("firebase_uid")
   organizationId String       @map("organization_id") @db.Uuid
+  email          String
   role           UserRole     @default(EMPLOYEE)
   fullName       String       @map("full_name")
   avatarUrl      String?      @map("avatar_url")
@@ -131,9 +135,11 @@ model Profile {
   updatedAt      DateTime     @updatedAt @map("updated_at")
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   employee       Employee?
+  auditLogs      AuditLog[]
 
   @@index([organizationId])
-  @@map("profiles")
+  @@unique([organizationId, email])
+  @@map("users")
 }
 
 model Department {
@@ -170,7 +176,7 @@ model Employee {
   createdAt             DateTime               @default(now()) @map("created_at")
   updatedAt             DateTime               @updatedAt @map("updated_at")
   organization          Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  profile               Profile?               @relation(fields: [profileId], references: [id], onDelete: SetNull)
+  profile               User?                  @relation(fields: [profileId], references: [id], onDelete: SetNull)
   department            Department?            @relation(fields: [departmentId], references: [id], onDelete: SetNull)
   attendance            Attendance[]
   leaveRequests         LeaveRequest[]
@@ -610,4 +616,40 @@ model ScheduledReminder {
   @@index([isActive, nextRunAt])
   @@index([organizationId, type])
   @@map("scheduled_reminders")
+}
+
+model AuditLog {
+  id             String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String?       @map("organization_id") @db.Uuid
+  userId         String?       @map("user_id") @db.Uuid
+  action         String
+  resource       String
+  resourceId     String?       @map("resource_id")
+  metadata       Json?
+  ipAddress      String?       @map("ip_address")
+  userAgent      String?       @map("user_agent")
+  createdAt      DateTime      @default(now()) @map("created_at")
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  user           User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, createdAt])
+  @@index([userId, createdAt])
+  @@index([action, createdAt])
+  @@map("audit_logs")
+}
+
+model OrganizationInvite {
+  id             String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  email          String
+  role           UserRole     @default(EMPLOYEE)
+  tokenHash      String       @unique @map("token_hash")
+  expiresAt      DateTime     @map("expires_at")
+  acceptedAt     DateTime?    @map("accepted_at")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, email])
+  @@index([expiresAt, acceptedAt])
+  @@map("organization_invites")
 }

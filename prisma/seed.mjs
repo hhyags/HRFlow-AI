@@ -25,13 +25,21 @@ async function main() {
     ['EMP-003', 'Elena', 'Rodriguez', 'elena.rodriguez@acme.test', 'People Operations Lead', 'People', 'REMOTE', 105000],
     ['EMP-004', 'David', 'Kim', 'david.kim@acme.test', 'Product Manager', 'Product', 'ACTIVE', 118000],
     ['EMP-005', 'Aisha', 'Patel', 'aisha.patel@acme.test', 'Growth Marketing Manager', 'Marketing', 'ON_LEAVE', 96000],
+    ['EMP-006', 'Lucas', 'Martin', 'lucas.martin@acme.test', 'Talent Acquisition Partner', 'People', 'ACTIVE', 92000],
+    ['EMP-007', 'Sophia', 'Turner', 'sophia.turner@acme.test', 'Technical Recruiter', 'People', 'ACTIVE', 90000],
+    ['EMP-008', 'Omar', 'Hassan', 'omar.hassan@acme.test', 'Backend Engineer', 'Engineering', 'REMOTE', 116000],
+    ['EMP-009', 'Grace', 'Lee', 'grace.lee@acme.test', 'Recruitment Coordinator', 'People', 'ACTIVE', 78000],
+    ['EMP-010', 'Benjamin', 'Clark', 'benjamin.clark@acme.test', 'Product Recruiter', 'People', 'ACTIVE', 94000],
   ]
   const employees = []
   for (let index = 0; index < rows.length; index += 1) {
     const [employeeNumber, firstName, lastName, email, jobTitle, department, status, salary] = rows[index]
     employees.push(await prisma.employee.upsert({
       where: { organizationId_employeeNumber: { organizationId, employeeNumber } },
-      update: {},
+      update: {
+        firstName, lastName, email, jobTitle, status, salary,
+        departmentId: departments[department].id,
+      },
       create: {
         organizationId, employeeNumber, firstName, lastName, email, jobTitle, status, salary,
         departmentId: departments[department].id,
@@ -41,22 +49,72 @@ async function main() {
     }))
   }
 
+  const demoUser = await prisma.user.upsert({
+    where: { firebaseUid: process.env.FIREBASE_DEMO_UID || 'configure-firebase-demo-uid' },
+    update: {},
+    create: {
+      firebaseUid: process.env.FIREBASE_DEMO_UID || 'configure-firebase-demo-uid',
+      organizationId,
+      email: 'elena.rodriguez@acme.test',
+      fullName: 'Elena Rodriguez',
+      role: 'HR_MANAGER',
+    },
+  })
+  await prisma.employee.update({
+    where: { id: employees[2].id },
+    data: { profileId: demoUser.id },
+  })
+
+  const recruiterIndexes = [0, 3, 5, 6, 8]
+  for (let index = 0; index < recruiterIndexes.length; index += 1) {
+    const employee = employees[recruiterIndexes[index]]
+    const recruiter = await prisma.user.upsert({
+      where: { firebaseUid: `seed:recruiter:${index + 1}` },
+      update: {
+        organizationId,
+        email: employee.email,
+        fullName: `${employee.firstName} ${employee.lastName}`,
+        role: 'RECRUITER',
+      },
+      create: {
+        firebaseUid: `seed:recruiter:${index + 1}`,
+        organizationId,
+        email: employee.email,
+        fullName: `${employee.firstName} ${employee.lastName}`,
+        role: 'RECRUITER',
+      },
+    })
+    await prisma.employee.update({
+      where: { id: employee.id },
+      data: { profileId: recruiter.id },
+    })
+  }
+
   const jobSpecs = [
     ['Product Designer', 'Design', 2],
     ['Frontend Engineer', 'Engineering', 4],
     ['People Partner', 'People', 1],
     ['Data Analyst', 'Product', 2],
+    ['Backend Engineer', 'Engineering', 3],
   ]
   const jobs = []
   for (const [title, department, openings] of jobSpecs) {
     const existing = await prisma.job.findFirst({ where: { organizationId, title } })
-    jobs.push(existing || await prisma.job.create({
-      data: {
+    jobs.push(existing
+      ? await prisma.job.update({
+          where: { id: existing.id },
+          data: {
+            departmentId: departments[department].id,
+            description: `Join Acme Corporation as a ${title}.`,
+            openings,
+            status: 'OPEN',
+          },
+        })
+      : await prisma.job.create({ data: {
         organizationId, departmentId: departments[department].id, title,
         description: `Join Acme Corporation as a ${title}.`,
         location: 'Hybrid', openings, status: 'OPEN', publishedAt: new Date(),
-      },
-    }))
+      } }))
   }
 
   const candidateRows = [
@@ -67,11 +125,25 @@ async function main() {
     ['Olivia', 'Smith', 'olivia@example.test', 'INTERVIEW', 94, 2],
     ['Ethan', 'Reed', 'ethan@example.test', 'INTERVIEW', 88, 1],
     ['Liam', 'Carter', 'liam@example.test', 'SELECTED', 98, 0],
+    ['Amelia', 'Scott', 'amelia@example.test', 'APPLIED', 84, 3],
+    ['Henry', 'Adams', 'henry@example.test', 'SCREENING', 91, 4],
+    ['Isabella', 'Baker', 'isabella@example.test', 'INTERVIEW', 90, 1],
+    ['Mateo', 'Gomez', 'mateo@example.test', 'APPLIED', 82, 4],
+    ['Charlotte', 'Young', 'charlotte@example.test', 'SELECTED', 95, 2],
+    ['Daniel', 'Wilson', 'daniel@example.test', 'SCREENING', 87, 3],
+    ['Harper', 'Evans', 'harper@example.test', 'APPLIED', 85, 0],
+    ['Alexander', 'Moore', 'alexander@example.test', 'INTERVIEW', 93, 4],
+    ['Evelyn', 'King', 'evelyn@example.test', 'REJECTED', 64, 1],
+    ['Sebastian', 'Hall', 'sebastian@example.test', 'SCREENING', 89, 2],
+    ['Camila', 'Allen', 'camila@example.test', 'APPLIED', 88, 3],
+    ['Jack', 'Wright', 'jack@example.test', 'INTERVIEW', 92, 0],
+    ['Luna', 'Green', 'luna@example.test', 'APPLIED', 81, 1],
+    ['Michael', 'Nelson', 'michael@example.test', 'SCREENING', 86, 4],
   ]
   for (const [firstName, lastName, email, stage, aiScore, jobIndex] of candidateRows) {
     await prisma.candidate.upsert({
       where: { organizationId_email_jobId: { organizationId, email, jobId: jobs[jobIndex].id } },
-      update: {},
+      update: { stage, aiScore, skills: ['Communication', 'Collaboration', 'Problem solving'] },
       create: {
         organizationId, jobId: jobs[jobIndex].id, firstName, lastName, email, stage, aiScore,
         skills: ['Communication', 'Collaboration', 'Problem solving'],
@@ -81,16 +153,30 @@ async function main() {
 
   const today = new Date()
   today.setUTCHours(0, 0, 0, 0)
-  for (let index = 0; index < employees.length; index += 1) {
-    await prisma.attendance.upsert({
-      where: { employeeId_date: { employeeId: employees[index].id, date: today } },
-      update: {},
-      create: {
-        organizationId, employeeId: employees[index].id, date: today,
-        status: index === 4 ? 'ON_LEAVE' : index === 3 ? 'LATE' : 'PRESENT',
-        workMinutes: index === 4 ? 0 : 480,
-      },
-    })
+  for (let dayOffset = 0; dayOffset < 14; dayOffset += 1) {
+    const date = new Date(today)
+    date.setUTCDate(date.getUTCDate() - dayOffset)
+    if ([0, 6].includes(date.getUTCDay())) continue
+    for (let index = 0; index < employees.length; index += 1) {
+      const onLeave = index === 4 && dayOffset < 3
+      const late = !onLeave && (index + dayOffset) % 7 === 0
+      await prisma.attendance.upsert({
+        where: { employeeId_date: { employeeId: employees[index].id, date } },
+        update: {
+          status: onLeave ? 'ON_LEAVE' : late ? 'LATE' : 'PRESENT',
+          workMinutes: onLeave ? 0 : late ? 450 : 480,
+          overtimeMinutes: !onLeave && (index + dayOffset) % 5 === 0 ? 45 : 0,
+        },
+        create: {
+          organizationId,
+          employeeId: employees[index].id,
+          date,
+          status: onLeave ? 'ON_LEAVE' : late ? 'LATE' : 'PRESENT',
+          workMinutes: onLeave ? 0 : late ? 450 : 480,
+          overtimeMinutes: !onLeave && (index + dayOffset) % 5 === 0 ? 45 : 0,
+        },
+      })
+    }
   }
 
   const periodStart = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1))
@@ -99,12 +185,46 @@ async function main() {
     const baseSalary = Number(employee.salary || 0) / 12
     await prisma.payroll.upsert({
       where: { employeeId_periodStart_periodEnd: { employeeId: employee.id, periodStart, periodEnd } },
-      update: {},
+      update: { baseSalary, netPay: baseSalary, status: 'PAID', paidAt: new Date() },
       create: {
         organizationId, employeeId: employee.id, periodStart, periodEnd,
         baseSalary, netPay: baseSalary, status: 'PAID', paidAt: new Date(),
       },
     })
+  }
+
+  const leaveRows = [
+    [0, 'CASUAL', -14, -13, 2, 'Family commitment', 'APPROVED'],
+    [2, 'EARNED', 8, 10, 3, 'Planned vacation', 'PENDING'],
+    [4, 'SICK', -2, 0, 3, 'Medical leave', 'APPROVED'],
+    [6, 'CASUAL', 15, 15, 1, 'Personal appointment', 'PENDING'],
+    [8, 'EARNED', 22, 23, 2, 'Family event', 'PENDING'],
+  ]
+  for (const [employeeIndex, type, startOffset, endOffset, days, reason, status] of leaveRows) {
+    const startDate = new Date(today)
+    startDate.setUTCDate(startDate.getUTCDate() + startOffset)
+    const endDate = new Date(today)
+    endDate.setUTCDate(endDate.getUTCDate() + endOffset)
+    const existing = await prisma.leaveRequest.findFirst({
+      where: { employeeId: employees[employeeIndex].id, startDate, endDate, type },
+    })
+    if (existing) {
+      await prisma.leaveRequest.update({ where: { id: existing.id }, data: { days, reason, status } })
+    } else {
+      await prisma.leaveRequest.create({
+        data: {
+          organizationId,
+          employeeId: employees[employeeIndex].id,
+          type,
+          startDate,
+          endDate,
+          days,
+          reason,
+          status,
+          reviewedAt: status === 'APPROVED' ? new Date() : null,
+        },
+      })
+    }
   }
 
   const defaultShift = await prisma.shift.upsert({
@@ -165,7 +285,7 @@ async function main() {
           employeeId_policyId_year: {
             employeeId: employee.id,
             policyId: policy.id,
-            year: 2026,
+            year: today.getUTCFullYear(),
           },
         },
         update: {},
@@ -173,7 +293,7 @@ async function main() {
           organizationId,
           employeeId: employee.id,
           policyId: policy.id,
-          year: 2026,
+          year: today.getUTCFullYear(),
           openingBalance: annualAllowance,
         },
       })

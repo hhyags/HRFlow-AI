@@ -1,21 +1,24 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
-  getUser: vi.fn(),
+  verifyIdToken: vi.fn(),
+  verifySessionCookie: vi.fn(),
   findUnique: vi.fn(),
-  create: vi.fn(),
 }))
 
-vi.mock('@/lib/supabase/server', () => ({
-  createSupabaseServerClient: async () => ({ auth: { getUser: mocks.getUser } }),
+vi.mock('@/lib/firebase/admin', () => ({
+  getFirebaseAdminAuth: () => ({
+    verifyIdToken: mocks.verifyIdToken,
+    verifySessionCookie: mocks.verifySessionCookie,
+  }),
 }))
 vi.mock('@/lib/prisma', () => ({
-  getPrisma: () => ({ profile: { findUnique: mocks.findUnique, create: mocks.create } }),
+  getPrisma: () => ({ user: { findUnique: mocks.findUnique } }),
 }))
 
 const { getRequestAuth, requireAuth } = await import('@/lib/auth')
 
-function request({ method = 'GET', origin, bearer = false } = {}) {
+function request({ method = 'GET', origin, bearer = true } = {}) {
   const headers = new Headers()
   if (origin) headers.set('origin', origin)
   if (bearer) headers.set('authorization', 'Bearer token')
@@ -29,45 +32,44 @@ function request({ method = 'GET', origin, bearer = false } = {}) {
 describe('authentication and RBAC', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mocks.getUser.mockResolvedValue({ data: { user: { id: 'user', email: 'u@example.com', app_metadata: {} } }, error: null })
+    mocks.verifyIdToken.mockResolvedValue({ uid: 'firebase-user', email: 'u@example.com', email_verified: true })
   })
 
   it('returns an existing profile', async () => {
-    mocks.findUnique.mockResolvedValue({ id: 'user', organizationId: 'org', role: 'HR_MANAGER' })
+    mocks.findUnique.mockResolvedValue({
+      id: 'user', firebaseUid: 'firebase-user', email: 'u@example.com',
+      organizationId: 'org', role: 'HR_MANAGER',
+    })
     await expect(getRequestAuth(request())).resolves.toMatchObject({ profile: { role: 'HR_MANAGER' } })
   })
 
-  it('creates a profile from trusted app metadata', async () => {
-    mocks.getUser.mockResolvedValue({
-      data: { user: {
-        id: 'user', email: 'u@example.com',
-        app_metadata: { organization_id: 'org', role: 'EMPLOYEE' },
-        user_metadata: { full_name: 'User' },
-      } },
-      error: null,
-    })
+  it('rejects identities without a linked database user', async () => {
     mocks.findUnique.mockResolvedValue(null)
-    mocks.create.mockResolvedValue({ id: 'user', organizationId: 'org', role: 'EMPLOYEE' })
-    await expect(getRequestAuth(request())).resolves.toMatchObject({ profile: { organizationId: 'org' } })
+    await expect(getRequestAuth(request())).resolves.toBeNull()
   })
 
-  it('rejects missing users and missing organization metadata', async () => {
-    mocks.getUser.mockResolvedValueOnce({ data: { user: null }, error: new Error('invalid') })
-    await expect(getRequestAuth(request())).resolves.toBeNull()
-    mocks.findUnique.mockResolvedValue(null)
+  it('rejects mismatched emails', async () => {
+    mocks.findUnique.mockResolvedValue({ id: 'user', email: 'other@example.com' })
     await expect(getRequestAuth(request())).resolves.toBeNull()
   })
 
   it('enforces roles', async () => {
-    mocks.findUnique.mockResolvedValue({ id: 'user', organizationId: 'org', role: 'EMPLOYEE' })
+    mocks.findUnique.mockResolvedValue({ id: 'user', email: 'u@example.com', organizationId: 'org', role: 'EMPLOYEE' })
     const result = await requireAuth(request(), ['HR_MANAGER'])
     expect(result.error.status).toBe(403)
   })
 
+  it('requires verified email addresses', async () => {
+    mocks.verifyIdToken.mockResolvedValue({ uid: 'firebase-user', email: 'u@example.com', email_verified: false })
+    mocks.findUnique.mockResolvedValue({ id: 'user', email: 'u@example.com', organizationId: 'org', role: 'EMPLOYEE' })
+    const result = await requireAuth(request())
+    expect(result.error.status).toBe(403)
+  })
+
   it('rejects cross-origin cookie mutations but permits bearer requests', async () => {
-    const denied = await requireAuth(request({ method: 'POST', origin: 'https://evil.example' }))
+    const denied = await requireAuth(request({ method: 'POST', origin: 'https://evil.example', bearer: false }))
     expect(denied.error.status).toBe(403)
-    mocks.findUnique.mockResolvedValue({ id: 'user', organizationId: 'org', role: 'HR_MANAGER' })
+    mocks.findUnique.mockResolvedValue({ id: 'user', email: 'u@example.com', organizationId: 'org', role: 'HR_MANAGER' })
     const allowed = await requireAuth(request({ method: 'POST', origin: 'https://evil.example', bearer: true }))
     expect(allowed.profile.role).toBe('HR_MANAGER')
   })

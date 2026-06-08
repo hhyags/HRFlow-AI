@@ -1,10 +1,14 @@
 # HRFlow AI
 
-## Supabase setup
+## Production stack
 
-1. Create a Supabase project and copy `.env.example` to `.env.local`.
-2. Add the project URL, anon key, service role key, pooled database URL, and direct database URL.
-3. Apply the schema:
+HRFlow AI uses Firebase Authentication, PostgreSQL with Prisma, Supabase private
+Storage and RLS, Gemini 2.5 Flash, and Vercel.
+
+1. Copy `.env.example` to `.env.local` and configure Firebase, Supabase, PostgreSQL, and Gemini.
+2. Enable Email/Password and Google authentication in Firebase.
+3. Enable the Firebase third-party auth integration in Supabase.
+4. Apply the schema:
 
 ```powershell
 npm run prisma:generate
@@ -12,14 +16,20 @@ npm run db:migrate
 npm run db:seed
 ```
 
-4. Create the first Supabase Auth user with `POST /api/auth/register`. Use the seeded organization ID:
+5. Set `FIREBASE_DEMO_UID` to the Firebase UID of the first HR Manager before seeding.
+   The seeded organization ID is:
 
 ```text
 11111111-1111-4111-8111-111111111111
 ```
 
-Set its role to `HR_MANAGER` and send the configured `HRFLOW_BOOTSTRAP_SECRET` in the
-`x-bootstrap-secret` header. Supabase metadata and the database trigger create the matching application profile.
+Firebase identities are linked to internal UUID users in PostgreSQL. Secure session
+cookies protect the dashboard, API guards enforce database roles, and Firebase custom
+claims allow Supabase Storage/RLS to authorize the same identity.
+
+HR Managers issue single-use Recruiter or Employee signup codes with
+`POST /api/auth/invitations`. The code is stored only as a SHA-256 hash and is bound to
+the invited email and organization.
 
 ## API
 
@@ -45,7 +55,8 @@ Other endpoints:
 - `/api/auth/register`
 - `/api/auth/reset-password`
 
-The UI retains its demo dataset when Supabase is not configured. With a valid session, dashboard, employee, and recruitment screens load live API data.
+The dashboard requires a verified Firebase session. With a valid session, dashboard,
+employee, and recruitment screens load live organization-scoped API data.
 
 ## Gemini AI
 
@@ -96,3 +107,16 @@ npm run build
 
 Playwright uses the locally installed Chrome by default. Set `PLAYWRIGHT_CHANNEL=msedge`
 to run the E2E suite with Microsoft Edge instead.
+
+## Launch documentation
+
+The complete production handoff is under [`docs`](docs):
+
+- Firebase, environment, Prisma, Supabase, and Gemini setup
+- Vercel and production deployment
+- Security and monitoring guidance
+- Post-deployment validation checklist
+- Dated production validation report
+
+Run `npm run production:check` with production-like environment variables before release.
+Deploy with `powershell -File scripts/deploy-vercel.ps1`.

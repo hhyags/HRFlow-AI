@@ -1,6 +1,8 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { signOut } from 'firebase/auth'
+import { getFirebaseClientAuth } from '@/lib/firebase/client'
 import {
   Activity,
   BarChart3,
@@ -163,7 +165,7 @@ function Sidebar({ active, setActive, open, setOpen, compact, setCompact }) {
   )
 }
 
-function Header({ setOpen, dark, setDark }) {
+function Header({ setOpen, dark, setDark, logout }) {
   return (
     <header className="header">
       <button className="iconButton mobileMenu" onClick={() => setOpen(true)}><Menu size={20} /></button>
@@ -177,7 +179,7 @@ function Header({ setOpen, dark, setDark }) {
           {dark ? <Sun size={18} /> : <Moon size={18} />}
         </button>
         <button className="iconButton notification"><Bell size={18} /><span /></button>
-        <button className="profileButton">
+        <button className="profileButton" onClick={logout} title="Sign out">
           <Avatar initials="GS" color="#4f46e5" small />
           <span><b>Goutham Sai</b><small>HR Administrator</small></span>
           <ChevronDown size={14} />
@@ -590,12 +592,17 @@ export default function Home() {
   const [compact, setCompact] = useState(false)
   const [dark, setDark] = useState(false)
   const liveData = useHrflowData()
+  const logout = async () => {
+    await fetch('/api/auth/logout', { method: 'POST' }).catch(() => {})
+    await signOut(getFirebaseClientAuth()).catch(() => {})
+    window.location.assign('/login')
+  }
 
   return (
     <div className={`app ${dark ? 'dark' : ''}`}>
       <Sidebar active={active} setActive={setActive} open={sidebarOpen} setOpen={setSidebarOpen} compact={compact} setCompact={setCompact} />
       <div className={`mainShell ${compact ? 'shellCompact' : ''}`}>
-        <Header setOpen={setSidebarOpen} dark={dark} setDark={setDark} />
+        <Header setOpen={setSidebarOpen} dark={dark} setDark={setDark} logout={logout} />
         <main className={active === 'copilot' ? 'content contentChat' : 'content'}>
           {active === 'dashboard' && <Dashboard data={liveData.dashboard} />}
           {active === 'employees' && <EmployeesPage employees={liveData.employees || demoEmployees} />}
