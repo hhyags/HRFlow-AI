@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/production-jobs",
+      "schedule": "0 2 * * *"
+    }
+  ]
+}

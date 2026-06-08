@@ -1,19 +1,46 @@
 {
-  "name": "goutham-sai-portfolio",
+  "name": "hrflow-ai",
   "version": "1.0.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "prisma:generate": "prisma generate",
+    "db:push": "prisma db push",
+    "db:migrate": "prisma migrate deploy",
+    "db:seed": "prisma db seed",
+    "test": "vitest run",
+    "test:unit": "vitest run tests/unit",
+    "test:integration": "vitest run tests/integration",
+    "test:coverage": "vitest run --coverage",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
+    "@google/genai": "^2.8.0",
+    "@prisma/client": "^6.19.3",
+    "@supabase/ssr": "^0.10.3",
+    "@supabase/supabase-js": "^2.107.0",
     "gsap": "latest",
     "lucide-react": "latest",
     "next": "latest",
+    "pdf-lib": "^1.17.1",
     "react": "latest",
     "react-dom": "latest",
-    "three": "latest"
+    "resend": "^6.12.4",
+    "three": "latest",
+    "zod": "^4.4.3"
   },
-  "devDependencies": {}
+  "devDependencies": {
+    "@playwright/test": "^1.60.0",
+    "@vitest/coverage-v8": "^4.1.8",
+    "prisma": "^6.19.3",
+    "vitest": "^4.1.8"
+  },
+  "overrides": {
+    "postcss": "8.5.10"
+  },
+  "prisma": {
+    "seed": "node prisma/seed.mjs"
+  }
 }
