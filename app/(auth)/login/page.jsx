@@ -19,6 +19,15 @@ export default function LoginPage() {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
 
+  function authenticationMessage(cause) {
+    if (cause?.code === 'auth/invalid-credential') return 'The email or password is incorrect.'
+    if (cause?.code === 'auth/too-many-requests') return 'Too many attempts. Wait a moment or reset your password.'
+    if (cause?.code === 'auth/internal-error') {
+      return 'Your browser blocked secure sign-in storage. Refresh the page or try a private window.'
+    }
+    return cause?.message || 'Unable to sign in.'
+  }
+
   async function finish(user) {
     const { response, body } = await establishServerSession(user)
     if (body.code === 'EMAIL_NOT_VERIFIED') {
@@ -45,7 +54,7 @@ export default function LoginPage() {
       )
       await finish(credential.user)
     } catch (cause) {
-      setError(cause.message || 'Unable to sign in.')
+      setError(authenticationMessage(cause))
     } finally {
       setBusy(false)
     }
@@ -59,7 +68,7 @@ export default function LoginPage() {
       const credential = await signInWithPopup(getFirebaseClientAuth(), new GoogleAuthProvider())
       await finish(credential.user)
     } catch (cause) {
-      setError(cause.message || 'Google sign in failed.')
+      setError(authenticationMessage(cause))
     } finally {
       setBusy(false)
     }
