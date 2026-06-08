@@ -26,3 +26,15 @@ jobs:
       - run: npm run test:coverage
       - run: npm run build
       - run: npm audit --omit=dev
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+      - name: Run real-auth Playwright tests
+        run: npm run test:e2e
+        env:
+          PLAYWRIGHT_BASE_URL: ${{ secrets.HRFLOW_PRODUCTION_URL }}
+          QA_HR_MANAGER_EMAIL: ${{ secrets.QA_HR_MANAGER_EMAIL }}
+          QA_HR_MANAGER_PASSWORD: ${{ secrets.QA_HR_MANAGER_PASSWORD }}
+          QA_RECRUITER_1_EMAIL: ${{ secrets.QA_RECRUITER_1_EMAIL }}
+          QA_RECRUITER_1_PASSWORD: ${{ secrets.QA_RECRUITER_1_PASSWORD }}
+          QA_EMPLOYEE_1_EMAIL: ${{ secrets.QA_EMPLOYEE_1_EMAIL }}
+          QA_EMPLOYEE_1_PASSWORD: ${{ secrets.QA_EMPLOYEE_1_PASSWORD }}

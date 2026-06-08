@@ -8,6 +8,9 @@ const publicPages = new Set([
   '/forgot-password',
   '/reset-password',
   '/verify-email',
+  '/robots.txt',
+  '/sitemap.xml',
+  '/opengraph-image',
 ])
 
 async function hasValidSession(request) {

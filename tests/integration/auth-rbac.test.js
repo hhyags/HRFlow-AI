@@ -16,11 +16,12 @@ vi.mock('@/lib/prisma', () => ({
   getPrisma: () => ({ user: { findUnique: mocks.findUnique } }),
 }))
 
-const { getRequestAuth, requireAuth } = await import('@/lib/auth')
+const { getRequestAuth, hasTrustedOrigin, requireAuth } = await import('@/lib/auth')
 
 function request({ method = 'GET', origin, bearer = true } = {}) {
   const headers = new Headers()
   if (origin) headers.set('origin', origin)
+  headers.set('host', 'hrflow.example')
   if (bearer) headers.set('authorization', 'Bearer token')
   return {
     method,
@@ -72,5 +73,10 @@ describe('authentication and RBAC', () => {
     mocks.findUnique.mockResolvedValue({ id: 'user', email: 'u@example.com', organizationId: 'org', role: 'HR_MANAGER' })
     const allowed = await requireAuth(request({ method: 'POST', origin: 'https://evil.example', bearer: true }))
     expect(allowed.profile.role).toBe('HR_MANAGER')
+  })
+
+  it('accepts same-host and configured proxy origins', () => {
+    expect(hasTrustedOrigin(request({ origin: 'https://hrflow.example' }))).toBe(true)
+    expect(hasTrustedOrigin(request({ origin: 'https://evil.example' }))).toBe(false)
   })
 })

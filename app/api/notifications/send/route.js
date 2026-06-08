@@ -20,7 +20,7 @@ export async function POST(request) {
   const input = schema.safeParse(await request.json())
   if (!input.success) return NextResponse.json({ error: 'Invalid notification', details: input.error.flatten() }, { status: 400 })
   const prisma = getPrisma()
-  const profiles = await prisma.profile.findMany({
+  const profiles = await prisma.user.findMany({
     where: { id: { in: input.data.recipientIds }, organizationId: auth.profile.organizationId },
     include: { employee: true },
   })

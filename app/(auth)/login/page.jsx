@@ -33,11 +33,11 @@ export default function LoginPage() {
 
   async function submit(event) {
     event.preventDefault()
+    const form = new FormData(event.currentTarget)
     setBusy(true)
     setError('')
     try {
       await ensureFirebasePersistence()
-      const form = new FormData(event.currentTarget)
       const credential = await signInWithEmailAndPassword(
         getFirebaseClientAuth(),
         String(form.get('email')),

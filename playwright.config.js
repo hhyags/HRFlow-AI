@@ -1,4 +1,17 @@
 import { defineConfig, devices } from '@playwright/test'
+import { existsSync, readFileSync } from 'node:fs'
+
+if (existsSync('.env.qa.local')) {
+  for (const line of readFileSync('.env.qa.local', 'utf8').split(/\r?\n/)) {
+    const separator = line.indexOf('=')
+    if (separator <= 0) continue
+    const name = line.slice(0, separator)
+    if (!process.env[name]) process.env[name] = line.slice(separator + 1)
+  }
+}
+
+const baseURL = process.env.PLAYWRIGHT_BASE_URL || 'http://127.0.0.1:3000'
+const useLocalServer = !process.env.PLAYWRIGHT_BASE_URL
 
 export default defineConfig({
   testDir: './tests/e2e',
@@ -7,17 +20,16 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   reporter: [['list'], ['html', { open: 'never' }]],
   use: {
-    baseURL: 'http://127.0.0.1:3000',
+    baseURL,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
   },
-  webServer: {
-    command: 'npm run dev -- --hostname 127.0.0.1',
-    env: { ...process.env, E2E_AUTH_BYPASS: '1' },
-    url: 'http://127.0.0.1:3000',
+  webServer: useLocalServer ? {
+    command: 'npm run dev -- --webpack --hostname 127.0.0.1',
+    url: baseURL,
     reuseExistingServer: !process.env.CI,
     timeout: 120000,
-  },
+  } : undefined,
   projects: [
     {
       name: 'chromium',

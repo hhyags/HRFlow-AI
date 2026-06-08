@@ -1,13 +1,12 @@
 import { NextResponse } from 'next/server'
 import { getFirebaseAdminAuth } from '@/lib/firebase/admin'
 import { provisionFirebaseUser, SESSION_DURATION_MS, setSessionCookie } from '@/lib/firebase/session'
-import { requireAuth, roles } from '@/lib/auth'
+import { hasTrustedOrigin, requireAuth, roles } from '@/lib/auth'
 import { checkRateLimit, rateLimitKey } from '@/lib/rate-limit'
 
 export async function POST(request) {
   try {
-    const origin = request.headers.get('origin')
-    if (origin && origin !== request.nextUrl.origin) {
+    if (!hasTrustedOrigin(request)) {
       return NextResponse.json({ error: 'Invalid request origin' }, { status: 403 })
     }
     if (!checkRateLimit(rateLimitKey(request, 'auth-session'), { limit: 20 }).allowed) {

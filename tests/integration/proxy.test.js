@@ -25,6 +25,11 @@ describe('dashboard route protection', () => {
     expect(response.headers.get('location')).toBeNull()
   })
 
+  it.each(['/robots.txt', '/sitemap.xml', '/opengraph-image'])('allows public SEO asset %s', async (path) => {
+    const response = await proxy(new NextRequest(`https://hrflow.example${path}`))
+    expect(response.headers.get('location')).toBeNull()
+  })
+
   it('allows valid sessions and redirects authenticated login visits', async () => {
     verifySessionCookie.mockResolvedValue({ uid: 'firebase-user' })
     const headers = { cookie: 'hrflow_session=session-cookie' }

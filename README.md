@@ -5,6 +5,8 @@
 HRFlow AI uses Firebase Authentication, PostgreSQL with Prisma, Supabase private
 Storage and RLS, Gemini 2.5 Flash, and Vercel.
 
+Production: https://hrflow-ai-alpha.vercel.app
+
 1. Copy `.env.example` to `.env.local` and configure Firebase, Supabase, PostgreSQL, and Gemini.
 2. Enable Email/Password and Google authentication in Firebase.
 3. Enable the Firebase third-party auth integration in Supabase.
@@ -103,10 +105,12 @@ npm run db:seed
 npm run test:coverage
 npm run test:e2e
 npm run build
+npm run production:smoke
 ```
 
-Playwright uses the locally installed Chrome by default. Set `PLAYWRIGHT_CHANNEL=msedge`
-to run the E2E suite with Microsoft Edge instead.
+Playwright signs in with real Firebase QA accounts. Local credentials are generated in
+the ignored `.env.qa.local` file. CI requires the matching `QA_*` repository secrets and
+`HRFLOW_PRODUCTION_URL`.
 
 ## Launch documentation
 
@@ -121,3 +125,7 @@ The complete production handoff is under [`docs`](docs):
 
 Run `npm run production:check` with production-like environment variables before release.
 Deploy with `powershell -File scripts/deploy-vercel.ps1`.
+
+The application is live and its core production flows pass. Resend email delivery,
+external error monitoring, a custom domain, and provider credential rotation remain
+operator-owned launch requirements; see `docs/18-launch-readiness-report.md`.

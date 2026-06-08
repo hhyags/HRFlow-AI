@@ -69,7 +69,7 @@ export async function POST(request) {
     },
   })
   const approvals = await initializeApprovalChain(prisma, leaveRequest, policy.approvalLevels)
-  const managers = await prisma.profile.findMany({
+  const managers = await prisma.user.findMany({
     where: { organizationId: auth.profile.organizationId, role: 'HR_MANAGER' },
     select: { id: true },
   })

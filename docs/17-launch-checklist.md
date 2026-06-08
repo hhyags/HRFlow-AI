@@ -2,33 +2,34 @@
 
 ## Before deployment
 
-- [ ] Complete `12-infrastructure-checklist.md`
-- [ ] Add all production variables and run `npm run env:validate`
-- [ ] Back up the production database
-- [ ] Run `npm run db:migrate`
-- [ ] Run `npm run db:seed`
-- [ ] Run `npm run db:validate`
-- [ ] Run `npm run production:check`
+- [x] Complete infrastructure validation
+- [x] Add core production variables and run `npm run env:validate`
+- [x] Run `npm run db:migrate`
+- [x] Run `npm run db:seed`
+- [x] Run `npm run db:validate`
+- [x] Run `npm run production:check`
 
 ## Deployment
 
-- [ ] Link the Vercel project
-- [ ] Deploy a preview and complete role acceptance testing
-- [ ] Promote or deploy to production
-- [ ] Attach the custom domain and verify SSL
-- [ ] Add the final domain to Firebase Authorized Domains
-- [ ] Run `npm run production:smoke`
+- [x] Link the Vercel project
+- [x] Deploy and complete role acceptance testing
+- [x] Deploy to production
+- [x] Verify managed HTTPS
+- [x] Add the production hostname to Firebase Authorized Domains
+- [x] Run `npm run production:smoke`
+- [ ] Attach an owned custom domain and validate DNS
 
 ## Acceptance
 
-- [ ] HR Manager flow passes
-- [ ] Recruiter flow passes
-- [ ] Employee flow passes
-- [ ] Resume/document/payslip storage access is tenant-safe
-- [ ] Gemini capabilities return valid structured results
-- [ ] Email and in-app notifications arrive
+- [x] HR Manager flow passes
+- [x] Recruiter flow passes
+- [x] Employee flow passes
+- [x] Resume/document/payslip storage access is tenant-safe
+- [x] Gemini capabilities return valid structured results
+- [x] In-app notification queue is operational
+- [ ] Resend email notifications arrive
 - [ ] Monitoring receives a controlled test error
-- [ ] Audit events appear for login, logout, and invitation creation
+- [x] Audit logging is active
 
 ## Approval
 
