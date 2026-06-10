@@ -1,12 +1,13 @@
 'use client'
 
 import Link from 'next/link'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
+  getRedirectResult,
   GoogleAuthProvider,
   sendEmailVerification,
-  signInWithPopup,
+  signInWithRedirect,
 } from 'firebase/auth'
 import AuthShell from '../AuthShell'
 import styles from '../auth.module.css'
@@ -17,6 +18,27 @@ export default function LoginPage() {
   const router = useRouter()
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    let active = true
+    async function finishRedirect() {
+      try {
+        await ensureFirebasePersistence()
+        const credential = await getRedirectResult(getFirebaseClientAuth())
+        if (!credential || !active) return
+        setBusy(true)
+        await finish(credential.user)
+      } catch (cause) {
+        if (active) setError(authenticationMessage(cause))
+      } finally {
+        if (active) setBusy(false)
+      }
+    }
+    finishRedirect()
+    return () => {
+      active = false
+    }
+  }, [])
 
   function authenticationMessage(cause) {
     if (cause?.code === 'auth/invalid-credential') return 'The email or password is incorrect.'
@@ -64,11 +86,9 @@ export default function LoginPage() {
     setError('')
     try {
       await ensureFirebasePersistence()
-      const credential = await signInWithPopup(getFirebaseClientAuth(), new GoogleAuthProvider())
-      await finish(credential.user)
+      await signInWithRedirect(getFirebaseClientAuth(), new GoogleAuthProvider())
     } catch (cause) {
       setError(authenticationMessage(cause))
-    } finally {
       setBusy(false)
     }
   }
