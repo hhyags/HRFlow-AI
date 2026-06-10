@@ -6,13 +6,12 @@ import { useRouter } from 'next/navigation'
 import {
   GoogleAuthProvider,
   sendEmailVerification,
-  signInWithEmailAndPassword,
   signInWithPopup,
 } from 'firebase/auth'
 import AuthShell from '../AuthShell'
 import styles from '../auth.module.css'
 import { ensureFirebasePersistence, getFirebaseClientAuth } from '@/lib/firebase/client'
-import { establishServerSession } from '@/lib/firebase/browser-session'
+import { establishPasswordSession, establishServerSession } from '@/lib/firebase/browser-session'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -46,13 +45,13 @@ export default function LoginPage() {
     setBusy(true)
     setError('')
     try {
-      await ensureFirebasePersistence()
-      const credential = await signInWithEmailAndPassword(
-        getFirebaseClientAuth(),
+      const { response, body } = await establishPasswordSession(
         String(form.get('email')),
         String(form.get('password')),
       )
-      await finish(credential.user)
+      if (!response.ok) throw new Error(body.error || 'Unable to sign in.')
+      router.replace('/')
+      router.refresh()
     } catch (cause) {
       setError(authenticationMessage(cause))
     } finally {

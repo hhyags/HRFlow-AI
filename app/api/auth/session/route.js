@@ -13,13 +13,32 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Too many authentication attempts' }, { status: 429 })
     }
 
-    const {
+    let {
       idToken,
+      email,
+      password,
       fullName,
       organizationId,
       invitationToken,
       role = roles.EMPLOYEE,
     } = await request.json()
+
+    if (!idToken && email && password) {
+      const firebaseResponse = await fetch(
+        `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${process.env.NEXT_PUBLIC_FIREBASE_API_KEY}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password, returnSecureToken: true }),
+          cache: 'no-store',
+        },
+      )
+      const firebaseBody = await firebaseResponse.json()
+      if (!firebaseResponse.ok || !firebaseBody.idToken) {
+        return NextResponse.json({ error: 'The email or password is incorrect.' }, { status: 401 })
+      }
+      idToken = firebaseBody.idToken
+    }
     if (!idToken) return NextResponse.json({ error: 'Firebase ID token is required' }, { status: 400 })
 
     const firebaseAuth = getFirebaseAdminAuth()
