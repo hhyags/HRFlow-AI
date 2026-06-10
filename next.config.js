@@ -16,7 +16,7 @@ const securityHeaders = [
       "img-src 'self' data: blob: https://*.googleusercontent.com",
       "font-src 'self' data:",
       "style-src 'self' 'unsafe-inline'",
-      `script-src 'self' 'unsafe-inline'${process.env.NODE_ENV === 'development' ? " 'unsafe-eval'" : ''}`,
+      `script-src 'self' 'unsafe-inline' https://apis.google.com${process.env.NODE_ENV === 'development' ? " 'unsafe-eval'" : ''}`,
       "connect-src 'self' https://*.supabase.co https://*.googleapis.com https://*.firebaseapp.com https://securetoken.googleapis.com https://identitytoolkit.googleapis.com",
       "frame-src 'self' https://accounts.google.com https://*.firebaseapp.com",
       'upgrade-insecure-requests',
