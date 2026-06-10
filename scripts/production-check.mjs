@@ -4,6 +4,9 @@ const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm'
 const commands = [
   [npm, ['run', 'env:validate']],
   [npm, ['run', 'prisma:generate']],
+  [npm, ['run', 'prisma:validate']],
+  [npm, ['run', 'db:status']],
+  [npm, ['run', 'db:validate']],
   [npm, ['run', 'test:coverage']],
   [npm, ['run', 'build']],
   [npm, ['audit', '--omit=dev']],
