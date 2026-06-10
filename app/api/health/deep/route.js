@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server'
-import { GoogleGenAI } from '@google/genai'
 import { getPrisma } from '@/lib/prisma'
 import { getFirebaseAdminAuth } from '@/lib/firebase/admin'
 import { createSupabaseAdminClient } from '@/lib/supabase/server'
 import { environmentStatus } from '@/lib/env'
+import { checkGeminiConnectivity } from '@/lib/ai/service'
 
 async function check(name, operation) {
   const started = Date.now()
@@ -29,14 +29,7 @@ export async function GET(request) {
       const { error } = await createSupabaseAdminClient().storage.getBucket(bucket)
       if (error) throw error
     }),
-    check('gemini', async () => {
-      const response = await new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY }).models.generateContent({
-        model: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
-        contents: 'Reply with OK.',
-        config: { maxOutputTokens: 8, temperature: 0 },
-      })
-      if (!response.text) throw new Error('Gemini returned an empty response.')
-    }),
+    check('gemini', checkGeminiConnectivity),
   ]))
   const ok = environmentStatus().configured && Object.values(checks).every((item) => item.ok)
   return NextResponse.json({ status: ok ? 'ok' : 'degraded', checks }, { status: ok ? 200 : 503 })

@@ -38,13 +38,22 @@ await check('public health', async () => {
 })
 
 await check('deep dependencies', async () => {
-  const response = await expectStatus('/api/health/deep', [200], {
-    headers: { Authorization: `Bearer ${cronSecret}` },
-  })
-  const body = await response.json()
-  const failed = Object.entries(body.checks || {}).filter(([, result]) => !result.ok)
-  if (failed.length) throw new Error(`Failed dependencies: ${failed.map(([name]) => name).join(', ')}`)
-  return Object.keys(body.checks || {})
+  let lastError
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      const response = await expectStatus('/api/health/deep', [200], {
+        headers: { Authorization: `Bearer ${cronSecret}` },
+      })
+      const body = await response.json()
+      const failed = Object.entries(body.checks || {}).filter(([, result]) => !result.ok)
+      if (failed.length) throw new Error(`Failed dependencies: ${failed.map(([name]) => name).join(', ')}`)
+      return Object.keys(body.checks || {})
+    } catch (error) {
+      lastError = error
+      if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, 1000 * (attempt + 1)))
+    }
+  }
+  throw lastError
 })
 
 await check('route protection', async () => {
