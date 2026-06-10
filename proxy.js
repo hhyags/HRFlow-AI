@@ -30,7 +30,7 @@ export async function proxy(request) {
   requestHeaders.set('x-request-id', requestId)
   const path = request.nextUrl.pathname
   const e2eBypass = process.env.NODE_ENV !== 'production' && process.env.E2E_AUTH_BYPASS === '1'
-  const firebaseAuthHelper = path.startsWith('/__/auth/')
+  const firebaseAuthHelper = path.startsWith('/__/auth/') || path.startsWith('/__/firebase/')
 
   if (path.startsWith('/api/') || firebaseAuthHelper || e2eBypass) {
     const response = NextResponse.next({ request: { headers: requestHeaders } })

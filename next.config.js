@@ -32,6 +32,10 @@ module.exports = {
         source: '/__/auth/:path*',
         destination: 'https://hrflow-ai.firebaseapp.com/__/auth/:path*',
       },
+      {
+        source: '/__/firebase/init.json',
+        destination: '/api/firebase/init',
+      },
     ]
   },
   async headers() {

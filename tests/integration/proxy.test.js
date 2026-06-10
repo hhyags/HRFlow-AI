@@ -30,7 +30,7 @@ describe('dashboard route protection', () => {
     expect(response.headers.get('location')).toBeNull()
   })
 
-  it.each(['/__/auth/handler', '/__/auth/iframe'])(
+  it.each(['/__/auth/handler', '/__/auth/iframe', '/__/firebase/init.json'])(
     'allows Firebase authentication helper %s',
     async (path) => {
       const response = await proxy(new NextRequest(`https://hrflow.example${path}`))
