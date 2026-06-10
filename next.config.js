@@ -26,6 +26,14 @@ const securityHeaders = [
 
 module.exports = {
   poweredByHeader: false,
+  async rewrites() {
+    return [
+      {
+        source: '/__/auth/:path*',
+        destination: 'https://hrflow-ai.firebaseapp.com/__/auth/:path*',
+      },
+    ]
+  },
   async headers() {
     return [
       { source: '/:path*', headers: securityHeaders },

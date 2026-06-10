@@ -81,8 +81,15 @@ test('Firebase authentication pages and real session persistence work', async ({
 })
 
 test('Google authentication uses redirect and is not popup-dependent', async ({ page }) => {
+  const oauthRequest = page.waitForRequest((request) => {
+    const url = new URL(request.url())
+    return url.hostname === 'accounts.google.com' && url.pathname === '/o/oauth2/auth'
+  })
   await page.goto('/login')
   await page.getByRole('button', { name: 'Continue with Google' }).click()
+  const request = await oauthRequest
   await page.waitForURL((url) => url.hostname === 'accounts.google.com', { timeout: 30000 })
-  expect(new URL(page.url()).searchParams.get('redirect_uri')).toContain('/__/auth/handler')
+  expect(new URL(request.url()).searchParams.get('redirect_uri')).toBe(
+    'https://hrflow-ai-alpha.vercel.app/__/auth/handler',
+  )
 })

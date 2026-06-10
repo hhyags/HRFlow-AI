@@ -30,6 +30,14 @@ describe('dashboard route protection', () => {
     expect(response.headers.get('location')).toBeNull()
   })
 
+  it.each(['/__/auth/handler', '/__/auth/iframe'])(
+    'allows Firebase authentication helper %s',
+    async (path) => {
+      const response = await proxy(new NextRequest(`https://hrflow.example${path}`))
+      expect(response.headers.get('location')).toBeNull()
+    },
+  )
+
   it('allows valid sessions and redirects authenticated login visits', async () => {
     verifySessionCookie.mockResolvedValue({ uid: 'firebase-user' })
     const headers = { cookie: 'hrflow_session=session-cookie' }
