@@ -4,14 +4,17 @@ import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
-  getRedirectResult,
   GoogleAuthProvider,
   sendEmailVerification,
   signInWithRedirect,
 } from 'firebase/auth'
 import AuthShell from '../AuthShell'
 import styles from '../auth.module.css'
-import { ensureFirebasePersistence, getFirebaseClientAuth } from '@/lib/firebase/client'
+import {
+  consumeFirebaseRedirectResult,
+  ensureFirebasePersistence,
+  getFirebaseClientAuth,
+} from '@/lib/firebase/client'
 import { establishPasswordSession, establishServerSession } from '@/lib/firebase/browser-session'
 
 export default function LoginPage() {
@@ -23,8 +26,7 @@ export default function LoginPage() {
     let active = true
     async function finishRedirect() {
       try {
-        await ensureFirebasePersistence()
-        const credential = await getRedirectResult(getFirebaseClientAuth())
+        const credential = await consumeFirebaseRedirectResult()
         if (!credential || !active) return
         setBusy(true)
         await finish(credential.user)
@@ -43,6 +45,10 @@ export default function LoginPage() {
   function authenticationMessage(cause) {
     if (cause?.code === 'auth/invalid-credential') return 'The email or password is incorrect.'
     if (cause?.code === 'auth/too-many-requests') return 'Too many attempts. Wait a moment or reset your password.'
+    if (cause?.code === 'auth/account-exists-with-different-credential') {
+      return 'This email already uses password sign-in. Sign in with your password once, then use Google.'
+    }
+    if (cause?.code === 'auth/redirect-cancelled-by-user') return 'Google sign-in was cancelled.'
     if (cause?.code === 'auth/internal-error') {
       return 'Your browser blocked secure sign-in storage. Refresh the page or try a private window.'
     }

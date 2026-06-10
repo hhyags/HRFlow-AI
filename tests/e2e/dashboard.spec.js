@@ -75,4 +75,14 @@ test('Firebase authentication pages and real session persistence work', async ({
   await login(page, accounts.manager)
   await page.reload()
   await expect(page.getByText('Good morning, Goutham')).toBeVisible()
+  await page.getByTitle('Sign out').click()
+  await expect(page).toHaveURL(/\/login$/)
+  expect((await page.request.get('/api/auth/session')).status()).toBe(401)
+})
+
+test('Google authentication uses redirect and is not popup-dependent', async ({ page }) => {
+  await page.goto('/login')
+  await page.getByRole('button', { name: 'Continue with Google' }).click()
+  await page.waitForURL((url) => url.hostname === 'accounts.google.com', { timeout: 30000 })
+  expect(new URL(page.url()).searchParams.get('redirect_uri')).toContain('/__/auth/handler')
 })
