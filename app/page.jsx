@@ -211,23 +211,23 @@ const actionFields = {
     ['lastName', 'Last name', 'text'],
     ['email', 'Email', 'email'],
     ['phone', 'Phone', 'text'],
-    ['jobId', 'Job ID (optional)', 'text'],
+    ['jobId', 'Job (optional)', 'job'],
   ],
   attendance: [
-    ['employeeId', 'Employee ID', 'text'],
+    ['employeeId', 'Employee', 'employee'],
     ['date', 'Date', 'date'],
     ['workMinutes', 'Work minutes', 'number'],
     ['overtimeMinutes', 'Overtime minutes', 'number'],
   ],
   leave: [
-    ['employeeId', 'Employee ID', 'text'],
+    ['employeeId', 'Employee', 'employee'],
+    ['type', 'Leave type', 'leaveType'],
     ['startDate', 'Start date', 'date'],
     ['endDate', 'End date', 'date'],
-    ['days', 'Days', 'number'],
     ['reason', 'Reason', 'textarea'],
   ],
   payroll: [
-    ['employeeId', 'Employee ID', 'text'],
+    ['employeeId', 'Employee', 'employee'],
     ['periodStart', 'Period start', 'date'],
     ['periodEnd', 'Period end', 'date'],
     ['baseSalary', 'Base salary', 'number'],
@@ -236,7 +236,7 @@ const actionFields = {
     ['netPay', 'Net pay', 'number'],
   ],
   review: [
-    ['employeeId', 'Employee ID', 'text'],
+    ['employeeId', 'Employee', 'employee'],
     ['period', 'Review period', 'text'],
     ['rating', 'Rating (0-5)', 'number'],
     ['goalsScore', 'Goals score (0-100)', 'number'],
@@ -245,6 +245,19 @@ const actionFields = {
   invitation: [
     ['email', 'Work email', 'email'],
     ['role', 'Access role', 'select'],
+  ],
+  correction: [
+    ['employeeId', 'Employee', 'employee'],
+    ['attendanceId', 'Attendance record ID (optional)', 'text'],
+    ['requestedCheckIn', 'Requested check-in', 'datetime-local'],
+    ['requestedCheckOut', 'Requested check-out', 'datetime-local'],
+    ['reason', 'Reason', 'textarea'],
+  ],
+  payrollRun: [
+    ['periodStart', 'Period start', 'date'],
+    ['periodEnd', 'Period end', 'date'],
+    ['overtimeHourlyRate', 'Overtime hourly rate', 'number'],
+    ['finalize', 'Payroll status', 'payrollStatus'],
   ],
 }
 
@@ -258,7 +271,7 @@ const actionResource = {
   review: 'reviews',
 }
 
-function ActionModal({ action, close, onSaved, role }) {
+function ActionModal({ action, close, onSaved, role, employees, jobs }) {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   if (!action) return null
@@ -268,22 +281,37 @@ function ActionModal({ action, close, onSaved, role }) {
     setBusy(true)
     setError('')
     const form = Object.fromEntries(new FormData(event.currentTarget))
-    const numeric = new Set(['salary', 'openings', 'workMinutes', 'overtimeMinutes', 'days', 'baseSalary', 'bonus', 'deductions', 'netPay', 'rating', 'goalsScore'])
+    for (const [key, value] of Object.entries(form)) {
+      if (value === '') delete form[key]
+    }
+    const numeric = new Set(['salary', 'openings', 'workMinutes', 'overtimeMinutes', 'baseSalary', 'bonus', 'deductions', 'netPay', 'rating', 'goalsScore', 'overtimeHourlyRate'])
     for (const key of numeric) {
       if (form[key] !== undefined && form[key] !== '') form[key] = Number(form[key])
     }
-    if (action.type === 'job') form.status = 'OPEN'
-    if (action.type === 'candidate') form.skills = []
+    if (action.type === 'job' && !action.record) form.status = 'OPEN'
+    if (action.type === 'candidate' && !action.record) form.skills = []
     if (action.type === 'attendance') form.status = 'PRESENT'
-    if (action.type === 'leave') form.type = 'CASUAL'
     if (action.type === 'payroll') form.status = 'DRAFT'
+    if (action.type === 'payrollRun') {
+      form.finalize = form.finalize === 'true'
+      form.bonuses = []
+      form.deductions = []
+    }
 
     try {
       const endpoint = action.type === 'invitation'
         ? '/api/auth/invitations'
-        : `/api/${actionResource[action.type]}`
+        : action.type === 'leave'
+          ? '/api/leave-workflow/requests'
+          : action.type === 'correction'
+            ? '/api/attendance-engine/corrections'
+            : action.type === 'payrollRun'
+              ? '/api/payroll-engine/process'
+              : action.record?.id
+                ? `/api/${actionResource[action.type]}/${action.record.id}`
+                : `/api/${actionResource[action.type]}`
       const response = await fetch(endpoint, {
-        method: 'POST',
+        method: action.record?.id ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),
       })
@@ -308,14 +336,22 @@ function ActionModal({ action, close, onSaved, role }) {
         <form className="modalForm" onSubmit={submit}>
           {error && <p className="formError">{error}</p>}
           {actionFields[action.type]
-            .filter(([name]) => !(action.type === 'leave' && role === 'EMPLOYEE' && name === 'employeeId'))
+            .filter(([name]) => !(['leave', 'correction'].includes(action.type) && role === 'EMPLOYEE' && name === 'employeeId'))
             .map(([name, label, type]) => (
             <label key={name}>{label}
               {type === 'textarea'
-                ? <textarea name={name} required={name === 'description' || name === 'reason'} />
+                ? <textarea name={name} defaultValue={action.record?.[name] || ''} required={name === 'description' || name === 'reason'} />
                 : type === 'select'
-                  ? <select name={name} defaultValue="EMPLOYEE"><option value="EMPLOYEE">Employee</option><option value="RECRUITER">Recruiter</option></select>
-                  : <input name={name} type={type} required={!label.includes('optional') && !['salary', 'location', 'phone', 'bonus', 'deductions', 'goalsScore'].includes(name)} />}
+                  ? <select name={name} defaultValue={action.record?.[name] || 'EMPLOYEE'}><option value="EMPLOYEE">Employee</option><option value="RECRUITER">Recruiter</option></select>
+                  : type === 'employee'
+                    ? <select name={name} defaultValue={action.record?.[name] || ''} required><option value="">Select employee</option>{employees.map((employee) => <option value={employee.id} key={employee.id}>{employee.name}</option>)}</select>
+                    : type === 'job'
+                      ? <select name={name} defaultValue={action.record?.[name] || ''}><option value="">Select job</option>{jobs.map((job) => <option value={job.id} key={job.id}>{job.title}</option>)}</select>
+                      : type === 'leaveType'
+                        ? <select name={name} defaultValue={action.record?.[name] || 'CASUAL'}><option value="CASUAL">Casual</option><option value="SICK">Sick</option><option value="EARNED">Earned</option><option value="UNPAID">Unpaid</option></select>
+                        : type === 'payrollStatus'
+                          ? <select name={name} defaultValue="false"><option value="false">Draft calculation</option><option value="true">Finalize and notify</option></select>
+                          : <input name={name} type={type} defaultValue={action.record?.[name] || ''} required={!label.includes('optional') && !['salary', 'location', 'phone', 'bonus', 'deductions', 'goalsScore', 'requestedCheckIn', 'requestedCheckOut'].includes(name)} />}
             </label>
             ))}
           <div className="modalActions">
@@ -516,7 +552,7 @@ function Dashboard({ data, employees, setActive, openAction, profile, canManage 
   )
 }
 
-function EmployeesPage({ employees = [], initialQuery = '', openAction, canManage, leaveRows = [] }) {
+function EmployeesPage({ employees = [], initialQuery = '', openAction, canManage, leaveRows = [], refresh }) {
   const [query, setQuery] = useState(initialQuery)
   useEffect(() => setQuery(initialQuery), [initialQuery])
   const filtered = useMemo(() => employees.filter((e) => `${e.name} ${e.role} ${e.dept}`.toLowerCase().includes(query.toLowerCase())), [employees, query])
@@ -527,6 +563,16 @@ function EmployeesPage({ employees = [], initialQuery = '', openAction, canManag
   const newJoiners = employees.filter((employee) => employee.joiningDateRaw && new Date(employee.joiningDateRaw) >= monthStart).length
   const now = new Date()
   const onLeave = leaveRows.filter((request) => request.status === 'APPROVED' && new Date(request.startDate) <= now && new Date(request.endDate) >= now).length
+  async function removeEmployee(employee) {
+    if (!window.confirm(`Delete ${employee.name}? This cannot be undone.`)) return
+    const response = await fetch(`/api/employees/${employee.id}`, { method: 'DELETE' })
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}))
+      window.alert(body.error || 'Unable to delete employee.')
+      return
+    }
+    refresh()
+  }
   return (
     <>
       <PageHeading title="People" description="Manage your employee directory, profiles, and employment information.">
@@ -553,7 +599,10 @@ function EmployeesPage({ employees = [], initialQuery = '', openAction, canManag
               <span>{employee.dept}</span>
               <span><i className={`statusPill ${employee.status.toLowerCase().replace(' ', '')}`}>{employee.status}</i></span>
               <span>{employee.joiningDate || 'Not set'}</span>
-              <button className="moreButton" onClick={() => navigator.clipboard.writeText(employee.id || employee.name)} title="Copy employee ID"><MoreHorizontal size={18} /></button>
+              <div className="rowActions">
+                {canManage && <button className="textButton" onClick={() => openAction('employee', 'Edit employee', employee.raw)}>Edit</button>}
+                {canManage && <button className="textButton dangerText" onClick={() => removeEmployee(employee)}>Delete</button>}
+              </div>
             </div>
           ))}
         </div>
@@ -562,8 +611,10 @@ function EmployeesPage({ employees = [], initialQuery = '', openAction, canManag
   )
 }
 
-function RecruitmentPage({ candidates = {}, openJobs = 0, openAction, canRecruit }) {
+function RecruitmentPage({ candidates = {}, openJobs = 0, openAction, canRecruit, jobs = [], refresh }) {
   const [query, setQuery] = useState('')
+  const [result, setResult] = useState('')
+  const [busyCandidate, setBusyCandidate] = useState('')
   const activeCandidates = Object.values(candidates).flat().length
   const filteredCandidates = Object.fromEntries(Object.entries(candidates).map(([stage, cards]) => [
     stage,
@@ -573,6 +624,78 @@ function RecruitmentPage({ candidates = {}, openJobs = 0, openAction, canRecruit
   const averageScore = scoredCandidates.length
     ? Math.round(scoredCandidates.reduce((sum, candidate) => sum + candidate.score, 0) / scoredCandidates.length)
     : 0
+  async function updateCandidate(candidate, data) {
+    const response = await fetch(`/api/candidates/${candidate.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    })
+    const body = await response.json().catch(() => ({}))
+    if (!response.ok) throw new Error(body.error || 'Unable to update candidate.')
+    refresh()
+  }
+
+  async function deleteCandidate(candidate) {
+    if (!window.confirm(`Delete ${candidate.name}?`)) return
+    const response = await fetch(`/api/candidates/${candidate.id}`, { method: 'DELETE' })
+    if (!response.ok) return window.alert('Unable to delete candidate.')
+    refresh()
+  }
+
+  function analyzeResume(candidate) {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = 'application/pdf'
+    input.onchange = async () => {
+      const file = input.files?.[0]
+      if (!file) return
+      setBusyCandidate(candidate.id)
+      try {
+        const upload = new FormData()
+        upload.set('file', file)
+        upload.set('category', 'resume')
+        upload.set('candidateId', candidate.id)
+        const stored = await fetch('/api/uploads', { method: 'POST', body: upload })
+        if (!stored.ok) throw new Error((await stored.json()).error || 'Resume upload failed.')
+        const analysis = new FormData()
+        analysis.set('file', file)
+        analysis.set('candidateId', candidate.id)
+        const response = await fetch('/api/ai/resume-analysis', { method: 'POST', body: analysis })
+        const body = await response.json()
+        if (!response.ok) throw new Error(body.error || 'Resume analysis failed.')
+        setResult(`${candidate.name}: ${body.data.summary}`)
+        refresh()
+      } catch (error) {
+        setResult(error.message)
+      } finally {
+        setBusyCandidate('')
+      }
+    }
+    input.click()
+  }
+
+  async function candidateAi(candidate, kind) {
+    if (!candidate.jobId) return setResult('Assign this candidate to a job before running AI ranking or interview questions.')
+    setBusyCandidate(candidate.id)
+    try {
+      const endpoint = kind === 'rank' ? '/api/ai/candidate-ranking' : '/api/ai/interview-questions'
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ candidateId: candidate.id, jobId: candidate.jobId }),
+      })
+      const body = await response.json()
+      if (!response.ok) throw new Error(body.error || 'AI request failed.')
+      setResult(kind === 'rank'
+        ? `${candidate.name}: ${body.data.matchScore}% match. ${body.data.hiringRecommendation}. ${body.data.recommendationRationale}`
+        : `${candidate.name}: ${[...body.data.technical, ...body.data.behavioral, ...body.data.roleSpecific].map((item) => item.question).join(' | ')}`)
+      refresh()
+    } catch (error) {
+      setResult(error.message)
+    } finally {
+      setBusyCandidate('')
+    }
+  }
   return (
     <>
       <PageHeading title="Recruitment" description="Move great candidates from application to offer, faster.">
@@ -590,6 +713,7 @@ function RecruitmentPage({ candidates = {}, openJobs = 0, openAction, canRecruit
         <button className="button secondary" onClick={() => setQuery('')}><Filter size={15} /> Clear</button>
         {canRecruit && <button className="button secondary" onClick={() => openAction('candidate', 'Add candidate')}>Add candidate</button>}
       </div>
+      {result && <div className="card actionResult"><Sparkles size={17} /><p>{result}</p><button className="iconButton" onClick={() => setResult('')}><X size={15} /></button></div>}
       <div className="kanban">
         {Object.entries(filteredCandidates).map(([stage, cards], stageIndex) => (
           <div className="kanbanColumn" key={stage}>
@@ -601,6 +725,16 @@ function RecruitmentPage({ candidates = {}, openJobs = 0, openAction, canRecruit
                 <div className="candidateMeta"><span><Sparkles size={13} /> AI score</span><strong>{candidate.score}%</strong></div>
                 <div className="scoreBar"><i style={{ width: `${candidate.score}%` }} /></div>
                 <small>Applied {candidate.appliedAt ? new Date(candidate.appliedAt).toLocaleDateString() : 'date unavailable'}</small>
+                {canRecruit && <div className="candidateActions">
+                  <select value={candidate.stage} onChange={(event) => updateCandidate(candidate, { stage: event.target.value })} aria-label={`Stage for ${candidate.name}`}>
+                    {['APPLIED', 'SCREENING', 'INTERVIEW', 'SELECTED', 'REJECTED'].map((stageValue) => <option value={stageValue} key={stageValue}>{stageValue}</option>)}
+                  </select>
+                  <button disabled={busyCandidate === candidate.id} onClick={() => analyzeResume(candidate)}>Resume AI</button>
+                  <button disabled={busyCandidate === candidate.id} onClick={() => candidateAi(candidate, 'rank')}>Rank</button>
+                  <button disabled={busyCandidate === candidate.id} onClick={() => candidateAi(candidate, 'questions')}>Questions</button>
+                  <button onClick={() => openAction('candidate', 'Edit candidate', candidate.raw)}>Edit</button>
+                  <button className="dangerText" onClick={() => deleteCandidate(candidate)}>Delete</button>
+                </div>}
               </div>
             ))}
             {canRecruit && <button className="addCandidate" onClick={() => openAction('candidate', `Add ${stage} candidate`)}><Plus size={15} /> Add candidate</button>}
@@ -689,6 +823,8 @@ function ModulePage({ type, rows = [], openAction, setActive, refresh, role }) {
   const Icon = navGroups.flatMap((group) => group.items).find((item) => item.id === type)?.icon || (type === 'notifications' ? Bell : Settings)
   const [analysis, setAnalysis] = useState('')
   const [busy, setBusy] = useState(false)
+  const [operation, setOperation] = useState('')
+  const [analyticsType, setAnalyticsType] = useState('WORKFORCE_PLANNING')
   const createTypes = role === 'HR_MANAGER'
     ? { attendance: 'attendance', leave: 'leave', payroll: 'payroll', performance: 'review', settings: 'invitation' }
     : role === 'EMPLOYEE'
@@ -701,7 +837,7 @@ function ModulePage({ type, rows = [], openAction, setActive, refresh, role }) {
       const response = await fetch('/api/ai/analytics', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: type === 'analytics' ? 'WORKFORCE_PLANNING' : 'ATTRITION_RISK', horizonMonths: 6 }),
+        body: JSON.stringify({ type: type === 'analytics' ? analyticsType : 'ATTRITION_RISK', horizonMonths: 6 }),
       })
       const body = await response.json()
       setAnalysis(response.ok ? body.data.executiveSummary : body.error || 'AI insights are temporarily unavailable.')
@@ -719,6 +855,33 @@ function ModulePage({ type, rows = [], openAction, setActive, refresh, role }) {
       body: JSON.stringify({ read: true }),
     })
     refresh()
+  }
+
+  async function runOperation(endpoint, body, success, method = 'POST') {
+    setOperation('')
+    setBusy(true)
+    try {
+      const response = await fetch(endpoint, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      const result = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(result.error || 'Operation failed.')
+      setOperation(success)
+      refresh()
+    } catch (error) {
+      setOperation(error.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function openDocument(row) {
+    const response = await fetch(`/api/uploads?path=${encodeURIComponent(row.storagePath)}`)
+    const body = await response.json()
+    if (!response.ok) return setOperation(body.error || 'Unable to open document.')
+    window.open(body.data.signedUrl, '_blank', 'noopener,noreferrer')
   }
 
   function uploadDocument() {
@@ -755,9 +918,19 @@ function ModulePage({ type, rows = [], openAction, setActive, refresh, role }) {
   return <>
     <PageHeading title={title} description={description}>
       <button className="button secondary" onClick={() => downloadCsv(type, rows)}><Upload size={16} /> Export</button>
-      {createTypes[type] && <button className="button primary" onClick={() => openAction(createTypes[type], `Create ${title} record`)}><Plus size={16} /> Create new</button>}
+      {createTypes[type] && type !== 'payroll' && <button className="button primary" onClick={() => openAction(createTypes[type], `Create ${title} record`)}><Plus size={16} /> Create new</button>}
+      {type === 'attendance' && role === 'EMPLOYEE' && <>
+        <button className="button secondary" disabled={busy} onClick={() => runOperation('/api/attendance-engine/clock', { action: 'CHECK_IN' }, 'Checked in successfully.')}>Check in</button>
+        <button className="button secondary" disabled={busy} onClick={() => runOperation('/api/attendance-engine/clock', { action: 'CHECK_OUT' }, 'Checked out successfully.')}>Check out</button>
+      </>}
+      {type === 'attendance' && <button className="button secondary" onClick={() => openAction('correction', 'Request attendance correction')}>Request correction</button>}
+      {type === 'payroll' && role === 'HR_MANAGER' && <>
+        <a className="button secondary" href="/api/payroll-engine/export">Export payroll</a>
+        <button className="button primary" onClick={() => openAction('payrollRun', 'Run payroll engine')}><CircleDollarSign size={16} /> Run payroll</button>
+      </>}
       {type === 'documents' && role !== 'RECRUITER' && <button className="button primary" onClick={uploadDocument}><Upload size={16} /> Upload document</button>}
     </PageHeading>
+    {operation && <div className="card actionResult"><Activity size={17} /><p>{operation}</p><button className="iconButton" onClick={() => setOperation('')}><X size={15} /></button></div>}
     <div className="moduleGrid">
       <div className="card moduleCard"><span>Total records</span><strong>{rows.length}</strong><p>Live organization data</p><div className="miniBars"><i /><i /><i /><i /><i /><i /></div></div>
       <div className="card moduleCard"><span>Current module</span><strong>{title}</strong><p>Protected by organization RBAC</p><div className="miniBars mini1"><i /><i /><i /><i /><i /><i /></div></div>
@@ -767,11 +940,19 @@ function ModulePage({ type, rows = [], openAction, setActive, refresh, role }) {
       {rows.length ? rows.slice(0, 50).map((row) => <div className="recordRow" key={row.id}>
         <div className="moduleHeroIcon"><Icon size={18} /></div>
         <div><b>{row.title || row.name || row.type || row.period || `${row.employee?.firstName || ''} ${row.employee?.lastName || ''}`.trim() || 'HRFlow record'}</b><p>{row.body || row.status || row.category || row.employee?.email || row.id}</p></div>
-        {type === 'payroll' && <a className="textButton" href={`/api/payroll-engine/payslip/${row.id}`} target="_blank">Payslip</a>}
-        {type === 'notifications' && row.status !== 'READ' && <button className="textButton" onClick={() => markRead(row.id)}>Mark read</button>}
+        <div className="rowActions">
+          {type === 'payroll' && <a className="textButton" href={`/api/payroll-engine/payslip/${row.id}`} target="_blank">Payslip</a>}
+          {type === 'documents' && <button className="textButton" onClick={() => openDocument(row)}>Open</button>}
+          {type === 'notifications' && !row.readAt && <button className="textButton" onClick={() => markRead(row.id)}>Mark read</button>}
+          {type === 'leave' && role === 'HR_MANAGER' && row.status === 'PENDING' && <>
+            <button className="textButton" disabled={busy} onClick={() => runOperation('/api/leave-workflow/approve', { leaveRequestId: row.id, level: 1, decision: 'APPROVED' }, 'Leave request approved.')}>Approve</button>
+            <button className="textButton dangerText" disabled={busy} onClick={() => runOperation('/api/leave-workflow/approve', { leaveRequestId: row.id, level: 1, decision: 'REJECTED' }, 'Leave request rejected.')}>Reject</button>
+          </>}
+          {type === 'leave' && role === 'EMPLOYEE' && row.status === 'PENDING' && <button className="textButton dangerText" onClick={() => runOperation(`/api/leave/${row.id}`, { status: 'CANCELLED' }, 'Leave request cancelled.', 'PUT')}>Cancel</button>}
+        </div>
       </div>) : <div className="emptyState"><Icon size={24} /><h2>No records yet</h2><p>Create the first real record for this module.</p></div>}
     </div>
-    <div className="card emptyModule"><div className="moduleHeroIcon"><Sparkles size={24} /></div><h2>AI insights</h2><p>{analysis || 'Generate an insight grounded in current organization data.'}</p><div className="headingActions"><button className="button secondary" disabled={busy} onClick={generateAnalysis}><Sparkles size={16} /> {busy ? 'Analyzing...' : 'Generate insight'}</button><button className="button secondary" onClick={() => setActive('copilot')}>Open Copilot</button></div></div>
+    <div className="card emptyModule"><div className="moduleHeroIcon"><Sparkles size={24} /></div><h2>AI insights</h2><p>{analysis || 'Generate an insight grounded in current organization data.'}</p><div className="headingActions">{type === 'analytics' && <select value={analyticsType} onChange={(event) => setAnalyticsType(event.target.value)}><option value="WORKFORCE_PLANNING">Workforce planning</option><option value="ATTRITION_RISK">Attrition risk</option><option value="HIRING_FORECAST">Hiring forecast</option></select>}<button className="button secondary" disabled={busy || role !== 'HR_MANAGER'} onClick={generateAnalysis}><Sparkles size={16} /> {busy ? 'Analyzing...' : 'Generate insight'}</button><button className="button secondary" onClick={() => setActive('copilot')}>Open Copilot</button></div></div>
   </>
 }
 
@@ -780,6 +961,7 @@ function useHrflowData(active) {
     dashboard: null,
     session: null,
     employees: [],
+    jobs: [],
     candidates: {},
     raw: {},
   })
@@ -799,32 +981,22 @@ function useHrflowData(active) {
       if (cancelled) return
       setData((current) => ({ ...current, session }))
 
-      const moduleEndpoints = {
-        attendance: '/api/attendance?limit=100',
-        leave: '/api/leave?limit=100',
-        payroll: '/api/payroll?limit=100',
-        performance: '/api/reviews?limit=100',
-        documents: '/api/documents',
-      }
-      const supplementalKey = active === 'employees' ? 'leave' : moduleEndpoints[active] ? active : null
-      const supplementalEndpoint = supplementalKey === 'leave'
-        ? '/api/leave?limit=100'
-        : moduleEndpoints[supplementalKey]
+      const role = session?.profile?.role
       const requests = [
-        fetch('/api/dashboard', { credentials: 'include' }),
+        role === 'HR_MANAGER' || role === 'RECRUITER' ? fetch('/api/dashboard', { credentials: 'include' }) : Promise.resolve(null),
         fetch('/api/employees?limit=100', { credentials: 'include' }),
-        fetch('/api/candidates?limit=100', { credentials: 'include' }),
+        role === 'HR_MANAGER' || role === 'RECRUITER' ? fetch('/api/jobs?limit=100', { credentials: 'include' }) : Promise.resolve(null),
+        role === 'HR_MANAGER' || role === 'RECRUITER' ? fetch('/api/candidates?limit=100', { credentials: 'include' }) : Promise.resolve(null),
         fetch('/api/notifications', { credentials: 'include' }),
       ]
-      if (supplementalEndpoint) requests.push(fetch(supplementalEndpoint, { credentials: 'include' }))
       const responses = await Promise.allSettled(requests)
 
       const read = async (result) => {
-        if (result.status !== 'fulfilled' || !result.value.ok) return null
+        if (result.status !== 'fulfilled' || !result.value?.ok) return null
         return (await result.value.json()).data
       }
 
-      const [dashboard, employeeRows, candidateRows, notifications, supplementalRows] = await Promise.all(responses.map(read))
+      const [dashboard, employeeRows, jobs, candidateRows, notifications] = await Promise.all(responses.map(read))
       if (cancelled) return
 
       const mappedEmployees = employeeRows?.map((employee, index) => ({
@@ -843,6 +1015,16 @@ function useHrflowData(active) {
           year: 'numeric',
         }),
         joiningDateRaw: employee.joiningDate,
+        raw: {
+          employeeNumber: employee.employeeNumber,
+          firstName: employee.firstName,
+          lastName: employee.lastName,
+          email: employee.email,
+          jobTitle: employee.jobTitle,
+          joiningDate: employee.joiningDate.slice(0, 10),
+          salary: employee.salary ? Number(employee.salary) : '',
+          location: employee.location || '',
+        },
       }))
 
       const groupedCandidates = candidateRows?.reduce((groups, candidate) => {
@@ -856,6 +1038,15 @@ function useHrflowData(active) {
           score: candidate.aiScore || 0,
           avatar: `${candidate.firstName[0]}${candidate.lastName[0]}`,
           appliedAt: candidate.appliedAt,
+          jobId: candidate.jobId,
+          stage: candidate.stage,
+          raw: {
+            firstName: candidate.firstName,
+            lastName: candidate.lastName,
+            email: candidate.email,
+            phone: candidate.phone || '',
+            jobId: candidate.jobId || '',
+          },
         })
         return groups
       }, { Applied: [], Screening: [], Interview: [], Selected: [] })
@@ -864,10 +1055,10 @@ function useHrflowData(active) {
         session,
         dashboard,
         employees: mappedEmployees || [],
+        jobs: jobs || [],
         candidates: groupedCandidates || {},
         raw: {
           ...current.raw,
-          ...(supplementalKey ? { [supplementalKey]: supplementalRows || [] } : {}),
           analytics: current.raw.analytics || [],
           notifications: notifications || [],
         },
@@ -876,7 +1067,28 @@ function useHrflowData(active) {
 
     load().catch(() => {})
     return () => { cancelled = true }
-  }, [active, version])
+  }, [version])
+
+  useEffect(() => {
+    const moduleEndpoints = {
+      attendance: '/api/attendance?limit=100',
+      leave: '/api/leave?limit=100',
+      payroll: '/api/payroll?limit=100',
+      performance: '/api/reviews?limit=100',
+      documents: '/api/documents',
+    }
+    const key = active === 'employees' ? 'leave' : moduleEndpoints[active] ? active : null
+    if (!key || !data.session) return
+    let cancelled = false
+    const endpoint = key === 'leave' ? '/api/leave?limit=100' : moduleEndpoints[key]
+    fetch(endpoint, { credentials: 'include' })
+      .then(async (response) => response.ok ? (await response.json()).data : [])
+      .then((rows) => {
+        if (!cancelled) setData((current) => ({ ...current, raw: { ...current.raw, [key]: rows || [] } }))
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [active, version, data.session])
 
   return { ...data, refresh: () => setVersion((current) => current + 1) }
 }
@@ -898,7 +1110,7 @@ export default function Home() {
     recruitment: Object.values(liveData.candidates).flat().length,
     leave: liveData.raw.leave?.filter((request) => request.status === 'PENDING').length || 0,
   }
-  const openAction = (type, title) => setAction({ type, title })
+  const openAction = (type, title, record = null) => setAction({ type, title, record })
   const onSaved = async (type, saved) => {
     if (type === 'invitation' && saved?.token) {
       await navigator.clipboard.writeText(saved.token).catch(() => {})
@@ -931,13 +1143,15 @@ export default function Home() {
         />
         <main className={active === 'copilot' ? 'content contentChat' : 'content'}>
           {active === 'dashboard' && <Dashboard data={liveData.dashboard} employees={liveData.employees} setActive={setActive} openAction={openAction} profile={profile} canManage={canManage} />}
-          {active === 'employees' && <EmployeesPage employees={liveData.employees} initialQuery={search} openAction={openAction} canManage={canManage} leaveRows={liveData.raw.leave} />}
+          {active === 'employees' && <EmployeesPage employees={liveData.employees} initialQuery={search} openAction={openAction} canManage={canManage} leaveRows={liveData.raw.leave} refresh={liveData.refresh} />}
           {active === 'recruitment' && (
             <RecruitmentPage
               candidates={liveData.candidates}
               openJobs={liveData.dashboard?.openJobs ?? 0}
               openAction={openAction}
               canRecruit={canRecruit}
+              jobs={liveData.jobs}
+              refresh={liveData.refresh}
             />
           )}
           {active === 'copilot' && <CopilotPage />}
@@ -953,7 +1167,7 @@ export default function Home() {
           )}
         </main>
       </div>
-      <ActionModal action={action} close={() => setAction(null)} onSaved={onSaved} role={role} />
+      <ActionModal action={action} close={() => setAction(null)} onSaved={onSaved} role={role} employees={liveData.employees} jobs={liveData.jobs} />
     </div>
   )
 }

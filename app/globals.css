@@ -185,7 +185,7 @@ kbd { padding: 3px 6px; border: 1px solid var(--border); border-radius: 5px; col
 .tableTools { padding: 13px 15px; border-bottom: 1px solid var(--border); display: flex; gap: 8px; }
 .tableSearch { width: 260px; height: 35px; padding: 0 10px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface-2); }
 .employeeTable { width: 100%; }
-.tableRow { min-height: 62px; padding: 0 16px; border-bottom: 1px solid var(--border); display: grid; grid-template-columns: minmax(240px, 1.6fr) 1fr .75fr .85fr 28px; align-items: center; gap: 15px; color: var(--muted); font-size: 10px; }
+.tableRow { min-height: 62px; padding: 0 16px; border-bottom: 1px solid var(--border); display: grid; grid-template-columns: minmax(240px, 1.6fr) 1fr .75fr .85fr auto; align-items: center; gap: 15px; color: var(--muted); font-size: 10px; }
 .tableRow:last-child { border-bottom: 0; }
 .tableHead { min-height: 38px; color: var(--subtle); background: var(--surface-2); font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
 .employeeCell { display: flex; align-items: center; gap: 10px; }
@@ -208,6 +208,13 @@ kbd { padding: 3px 6px; border: 1px solid var(--border); border-radius: 5px; col
 .candidateMeta { display: flex; align-items: center; justify-content: space-between; font-size: 8px; }.candidateMeta span { color: var(--muted); display: flex; align-items: center; gap: 4px; }.candidateMeta strong { color: var(--primary); }
 .scoreBar { height: 4px; margin: 6px 0 10px; border-radius: 5px; background: var(--border); overflow: hidden; }.scoreBar i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--primary), var(--primary-2)); }
 .candidateCard > small { color: var(--subtle); font-size: 7px; }.addCandidate { width: 100%; height: 31px; margin-top: 9px; border: 1px dashed var(--border); border-radius: 9px; color: var(--muted); background: transparent; display: flex; align-items: center; justify-content: center; gap: 5px; cursor: pointer; font-size: 8px; }
+.candidateActions { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 5px; }
+.candidateActions button, .candidateActions select { min-height: 25px; padding: 4px 6px; border: 1px solid var(--border); border-radius: 7px; color: var(--muted); background: var(--surface-2); font-size: 7px; cursor: pointer; }
+.candidateActions select { flex: 1 1 100%; }
+.rowActions { display: flex; align-items: center; justify-content: flex-end; gap: 7px; }
+.dangerText { color: var(--red) !important; }
+.actionResult { margin-bottom: 12px; padding: 11px 14px; display: flex; align-items: flex-start; gap: 10px; color: var(--primary); }
+.actionResult p { flex: 1; margin: 1px 0 0; color: var(--text); font-size: 9px; line-height: 1.55; }
 
 .contentChat { max-width: none; height: calc(100vh - 65px); padding: 0; }
 .copilotPage { height: 100%; display: grid; grid-template-columns: 205px minmax(360px, 1fr) 230px; }
@@ -251,7 +258,7 @@ kbd { padding: 3px 6px; border: 1px solid var(--border); border-radius: 5px; col
 .modalHead h2 { margin: 0; font-size: 17px; }
 .modalForm { padding: 20px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
 .modalForm label { display: grid; gap: 6px; color: var(--muted); font-size: 9px; font-weight: 650; }
-.modalForm input, .modalForm textarea { width: 100%; min-height: 40px; padding: 9px 11px; border: 1px solid var(--border); border-radius: 9px; outline: 0; background: var(--surface-2); color: var(--text); }
+.modalForm input, .modalForm textarea, .modalForm select { width: 100%; min-height: 40px; padding: 9px 11px; border: 1px solid var(--border); border-radius: 9px; outline: 0; background: var(--surface-2); color: var(--text); }
 .modalForm textarea { min-height: 90px; resize: vertical; }
 .modalForm label:has(textarea), .formError, .modalActions { grid-column: 1 / -1; }
 .formError { margin: 0; padding: 10px 12px; border-radius: 9px; color: #b91c1c; background: #fef2f2; font-size: 9px; }
