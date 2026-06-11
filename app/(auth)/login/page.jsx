@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import {
   GoogleAuthProvider,
   sendEmailVerification,
+  signInWithPopup,
   signInWithRedirect,
 } from 'firebase/auth'
 import AuthShell from '../AuthShell'
@@ -49,6 +50,8 @@ export default function LoginPage() {
       return 'This email already uses password sign-in. Sign in with your password once, then use Google.'
     }
     if (cause?.code === 'auth/redirect-cancelled-by-user') return 'Google sign-in was cancelled.'
+    if (cause?.code === 'auth/popup-closed-by-user') return 'Google sign-in was cancelled.'
+    if (cause?.code === 'auth/network-request-failed') return 'Unable to reach Google sign-in. Check your connection and try again.'
     if (cause?.code === 'auth/internal-error') {
       return 'Your browser blocked secure sign-in storage. Refresh the page or try a private window.'
     }
@@ -90,10 +93,23 @@ export default function LoginPage() {
   async function googleLogin() {
     setBusy(true)
     setError('')
+    const auth = getFirebaseClientAuth()
+    const provider = new GoogleAuthProvider()
     try {
-      await ensureFirebasePersistence()
-      await signInWithRedirect(getFirebaseClientAuth(), new GoogleAuthProvider())
+      const credential = await signInWithPopup(auth, provider)
+      await finish(credential.user)
     } catch (cause) {
+      if (cause?.code === 'auth/popup-blocked') {
+        try {
+          await ensureFirebasePersistence()
+          await signInWithRedirect(auth, provider)
+          return
+        } catch (redirectCause) {
+          setError(authenticationMessage(redirectCause))
+          setBusy(false)
+          return
+        }
+      }
       setError(authenticationMessage(cause))
       setBusy(false)
     }

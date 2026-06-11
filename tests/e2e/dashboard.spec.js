@@ -80,16 +80,11 @@ test('Firebase authentication pages and real session persistence work', async ({
   expect((await page.request.get('/api/auth/session')).status()).toBe(401)
 })
 
-test('Google authentication uses redirect and is not popup-dependent', async ({ page }) => {
-  const oauthRequest = page.waitForRequest((request) => {
-    const url = new URL(request.url())
-    return url.hostname === 'accounts.google.com' && url.pathname === '/o/oauth2/auth'
-  })
+test('Google authentication opens the Firebase-authorized account chooser', async ({ page, context }) => {
   await page.goto('/login')
+  const popupPromise = context.waitForEvent('page')
   await page.getByRole('button', { name: 'Continue with Google' }).click()
-  const request = await oauthRequest
-  await page.waitForURL((url) => url.hostname === 'accounts.google.com', { timeout: 30000 })
-  expect(new URL(request.url()).searchParams.get('redirect_uri')).toBe(
-    'https://hrflow-ai-alpha.vercel.app/__/auth/handler',
-  )
+  const popup = await popupPromise
+  await popup.waitForURL((url) => url.hostname === 'accounts.google.com', { timeout: 30000 })
+  expect(popup.url()).not.toContain('redirect_uri_mismatch')
 })
