@@ -1,13 +1,11 @@
 'use client'
 
 import Link from 'next/link'
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   createUserWithEmailAndPassword,
-  GoogleAuthProvider,
   sendEmailVerification,
-  signInWithPopup,
   updateProfile,
 } from 'firebase/auth'
 import AuthShell from '../AuthShell'
@@ -17,26 +15,27 @@ import { establishServerSession } from '@/lib/firebase/browser-session'
 
 export default function SignupPage() {
   const router = useRouter()
-  const formRef = useRef(null)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
 
-  async function provision(user, fullName, invitationToken) {
-    const { response, body } = await establishServerSession(user, { fullName, invitationToken })
-    if (!response.ok && body.code !== 'EMAIL_NOT_VERIFIED') {
-      throw new Error(body.error || 'Unable to join the organization.')
-    }
-    return body
+  function signupMessage(cause) {
+    if (cause?.code === 'auth/email-already-in-use') return 'An account already exists for this email. Sign in instead.'
+    if (cause?.code === 'auth/weak-password') return 'Use a stronger password with at least eight characters.'
+    if (cause?.code === 'auth/invalid-email') return 'Enter a valid work email address.'
+    if (cause?.code === 'auth/network-request-failed') return 'Unable to reach the sign-up service. Check your connection and try again.'
+    if (cause?.code === 'auth/too-many-requests') return 'Too many attempts. Wait a moment and try again.'
+    return cause?.message || 'Unable to create your account.'
   }
 
   async function submit(event) {
     event.preventDefault()
     setBusy(true)
     setError('')
+
     try {
       const form = new FormData(event.currentTarget)
       const fullName = String(form.get('fullName')).trim()
-      const invitationToken = String(form.get('invitationToken')).trim()
+      const organizationName = String(form.get('organizationName')).trim()
       await ensureFirebasePersistence()
       const credential = await createUserWithEmailAndPassword(
         getFirebaseClientAuth(),
@@ -44,35 +43,24 @@ export default function SignupPage() {
         String(form.get('password')),
       )
       await updateProfile(credential.user, { displayName: fullName })
+
       try {
-        await provision(credential.user, fullName, invitationToken)
+        const { response, body } = await establishServerSession(credential.user, {
+          fullName,
+          organizationName,
+        })
+        if (!response.ok && body.code !== 'EMAIL_NOT_VERIFIED') {
+          throw new Error(body.error || 'Unable to create your workspace.')
+        }
       } catch (cause) {
         await credential.user.delete().catch(() => {})
         throw cause
       }
+
       await sendEmailVerification(credential.user)
       router.replace('/verify-email')
     } catch (cause) {
-      setError(cause.message || 'Unable to create your account.')
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  async function googleSignup() {
-    setBusy(true)
-    setError('')
-    try {
-      const form = new FormData(formRef.current)
-      const invitationToken = String(form.get('invitationToken')).trim()
-      if (!invitationToken) throw new Error('Invitation code is required.')
-      await ensureFirebasePersistence()
-      const credential = await signInWithPopup(getFirebaseClientAuth(), new GoogleAuthProvider())
-      await provision(credential.user, credential.user.displayName, invitationToken)
-      router.replace('/')
-      router.refresh()
-    } catch (cause) {
-      setError(cause.message || 'Google sign up failed.')
+      setError(signupMessage(cause))
     } finally {
       setBusy(false)
     }
@@ -81,19 +69,17 @@ export default function SignupPage() {
   return (
     <AuthShell
       eyebrow="Get started"
-      title="Create your account"
-      description="Join your organization’s secure HRFlow workspace."
+      title="Create your workspace"
+      description="Start a secure HRFlow workspace for your organization."
       footer={<>Already have an account? <Link className={styles.link} href="/login">Sign in</Link></>}
     >
-      <form ref={formRef} className={styles.form} onSubmit={submit}>
+      <form className={styles.form} onSubmit={submit}>
         {error && <p className={styles.error}>{error}</p>}
         <label className={styles.field}>Full name<input name="fullName" autoComplete="name" required /></label>
+        <label className={styles.field}>Organization name<input name="organizationName" autoComplete="organization" required /></label>
         <label className={styles.field}>Work email<input name="email" type="email" autoComplete="email" required /></label>
-        <label className={styles.field}>Invitation code<input name="invitationToken" autoComplete="one-time-code" required /></label>
         <label className={styles.field}>Password<input name="password" type="password" autoComplete="new-password" minLength={8} required /></label>
-        <button className={styles.button} disabled={busy}>{busy ? 'Creating account…' : 'Create account'}</button>
-        <div className={styles.divider}>or</div>
-        <button className={`${styles.button} ${styles.google}`} type="button" onClick={googleSignup} disabled={busy}>Continue with Google</button>
+        <button className={styles.button} disabled={busy}>{busy ? 'Creating workspace...' : 'Create workspace'}</button>
       </form>
     </AuthShell>
   )

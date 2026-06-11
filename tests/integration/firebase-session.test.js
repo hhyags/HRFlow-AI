@@ -74,6 +74,28 @@ describe('Firebase user provisioning', () => {
     expect(mocks.writeAuditLog).toHaveBeenCalled()
   })
 
+  it('creates a new organization and assigns its creator as HR Manager', async () => {
+    const db = prisma()
+    db.organization.create = vi.fn().mockResolvedValue({ id: 'new-org' })
+    const result = await provisionFirebaseUser({
+      decodedToken: token,
+      organizationName: 'New Company',
+      fullName: 'Company Owner',
+      prisma: db,
+    })
+
+    expect(db.organization.create).toHaveBeenCalledWith({
+      data: {
+        name: 'New Company',
+        slug: expect.stringMatching(/^new-company-[a-f0-9]{8}$/),
+      },
+    })
+    expect(result.user).toMatchObject({
+      organizationId: 'new-org',
+      role: 'HR_MANAGER',
+    })
+  })
+
   it('requires a valid bootstrap secret for privileged roles', async () => {
     process.env.HRFLOW_BOOTSTRAP_SECRET = 'correct-secret'
     await expect(provisionFirebaseUser({
