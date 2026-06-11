@@ -7,6 +7,7 @@ const commands = [
   [npm, ['run', 'prisma:validate']],
   [npm, ['run', 'db:status']],
   [npm, ['run', 'db:validate']],
+  [npm, ['run', 'auth:reconcile']],
   [npm, ['run', 'test:coverage']],
   [npm, ['run', 'build']],
   [npm, ['audit', '--omit=dev']],

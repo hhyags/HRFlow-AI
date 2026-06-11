@@ -14,6 +14,9 @@ vi.mock('@/lib/prisma', () => ({
   getPrisma: () => ({ organizationInvite: { create: mocks.create } }),
 }))
 vi.mock('@/lib/audit', () => ({ writeAuditLog: mocks.writeAuditLog }))
+vi.mock('@/lib/email', () => ({
+  sendOrganizationInvitation: vi.fn().mockResolvedValue({ sent: true }),
+}))
 
 const invitations = await import('@/app/api/auth/invitations/route')
 

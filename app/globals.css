@@ -235,6 +235,27 @@ kbd { padding: 3px 6px; border: 1px solid var(--border); border-radius: 5px; col
 .miniBars { height: 45px; display: flex; align-items: flex-end; gap: 7px; }.miniBars i { flex: 1; height: 35%; border-radius: 3px 3px 0 0; background: color-mix(in srgb, var(--primary) 65%, transparent); }.miniBars i:nth-child(2) { height: 58%; }.miniBars i:nth-child(3) { height: 44%; }.miniBars i:nth-child(4) { height: 78%; }.miniBars i:nth-child(5) { height: 62%; }.miniBars i:nth-child(6) { height: 92%; }
 .mini1 i { background: color-mix(in srgb, var(--amber) 65%, transparent); }.mini2 i { background: color-mix(in srgb, var(--green) 65%, transparent); }
 .emptyModule { margin-top: 14px; padding: 34px; display: flex; flex-direction: column; align-items: center; text-align: center; }.emptyModule h2 { margin: 13px 0 5px; font-size: 14px; }.emptyModule p { margin: 0 0 15px; color: var(--muted); font-size: 9px; }
+.recordsCard { margin-top: 14px; overflow: hidden; }
+.recordRow { min-height: 64px; padding: 10px 16px; border-bottom: 1px solid var(--border); display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; }
+.recordRow:last-child { border-bottom: 0; }
+.recordRow .moduleHeroIcon { width: 36px; height: 36px; border-radius: 10px; }
+.recordRow b { font-size: 10px; }
+.recordRow p { margin: 4px 0 0; color: var(--muted); font-size: 8px; }
+.emptyState { min-height: 180px; padding: 30px; display: grid; place-items: center; align-content: center; color: var(--muted); text-align: center; }
+.emptyState h2 { margin: 10px 0 4px; color: var(--text); font-size: 14px; }
+.emptyState p { margin: 0; font-size: 9px; }
+.modalBackdrop { position: fixed; inset: 0; z-index: 100; padding: 24px; background: rgba(15,23,42,.58); backdrop-filter: blur(4px); display: grid; place-items: center; }
+.modalCard { width: min(560px, 100%); max-height: calc(100vh - 48px); overflow-y: auto; border: 1px solid var(--border); border-radius: 16px; background: var(--surface); box-shadow: 0 28px 80px rgba(15,23,42,.28); }
+.modalHead { padding: 18px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+.modalHead p { margin: 0 0 4px; color: var(--primary); font-size: 8px; font-weight: 700; text-transform: uppercase; }
+.modalHead h2 { margin: 0; font-size: 17px; }
+.modalForm { padding: 20px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.modalForm label { display: grid; gap: 6px; color: var(--muted); font-size: 9px; font-weight: 650; }
+.modalForm input, .modalForm textarea { width: 100%; min-height: 40px; padding: 9px 11px; border: 1px solid var(--border); border-radius: 9px; outline: 0; background: var(--surface-2); color: var(--text); }
+.modalForm textarea { min-height: 90px; resize: vertical; }
+.modalForm label:has(textarea), .formError, .modalActions { grid-column: 1 / -1; }
+.formError { margin: 0; padding: 10px 12px; border-radius: 9px; color: #b91c1c; background: #fef2f2; font-size: 9px; }
+.modalActions { padding-top: 5px; display: flex; justify-content: flex-end; gap: 8px; }
 
 @media (max-width: 1100px) {
   .metricsGrid { grid-template-columns: repeat(2, 1fr); }
@@ -263,6 +284,7 @@ kbd { padding: 3px 6px; border: 1px solid var(--border); border-radius: 5px; col
   .tableTools { flex-wrap: wrap; }.tableSearch { width: 100%; }.employeeTable { overflow-x: auto; }.tableRow { min-width: 570px; }
   .moduleHero { align-items: flex-start; flex-direction: column; }.moduleHero > .button { width: 100%; }
   .promptGrid { grid-template-columns: 1fr; }.chatMessages { padding: 18px 14px; }.chatComposer { margin: 0 12px 12px; }.chatTitle { padding: 0 13px; }.chatTitle p { display: none; }
+  .modalBackdrop { padding: 10px; }.modalForm { grid-template-columns: 1fr; }.modalForm label, .modalActions { grid-column: 1; }
 }
 
 @media (prefers-reduced-motion: reduce) {

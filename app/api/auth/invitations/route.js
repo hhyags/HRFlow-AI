@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { requireAuth, roles } from '@/lib/auth'
 import { getPrisma } from '@/lib/prisma'
 import { writeAuditLog } from '@/lib/audit'
+import { sendOrganizationInvitation } from '@/lib/email'
 
 const schema = z.object({
   email: z.email(),
@@ -22,7 +23,8 @@ export async function POST(request) {
   const token = randomBytes(32).toString('base64url')
   const tokenHash = createHash('sha256').update(token).digest('hex')
   const expiresAt = new Date(Date.now() + parsed.data.expiresInHours * 60 * 60 * 1000)
-  const invitation = await getPrisma().organizationInvite.create({
+  const prisma = getPrisma()
+  const invitation = await prisma.organizationInvite.create({
     data: {
       organizationId: auth.profile.organizationId,
       email: parsed.data.email.trim().toLowerCase(),
@@ -40,7 +42,22 @@ export async function POST(request) {
     resourceId: invitation.id,
     metadata: { email: invitation.email, role: invitation.role, expiresAt },
   })
+  const organization = await prisma.organization?.findUnique({
+    where: { id: auth.profile.organizationId },
+    select: { name: true },
+  })
+  let delivery = { sent: false, reason: 'Email delivery is not configured.' }
+  try {
+    delivery = await sendOrganizationInvitation({
+      email: invitation.email,
+      role: invitation.role,
+      token,
+      organizationName: organization?.name || 'your organization',
+    })
+  } catch (error) {
+    delivery = { sent: false, reason: error.message }
+  }
   return NextResponse.json({
-    data: { id: invitation.id, token, email: invitation.email, role: invitation.role, expiresAt },
+    data: { id: invitation.id, token, email: invitation.email, role: invitation.role, expiresAt, emailSent: delivery.sent, emailError: delivery.reason },
   }, { status: 201 })
 }

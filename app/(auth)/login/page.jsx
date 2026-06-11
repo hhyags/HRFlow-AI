@@ -52,6 +52,9 @@ export default function LoginPage() {
     if (cause?.code === 'auth/redirect-cancelled-by-user') return 'Google sign-in was cancelled.'
     if (cause?.code === 'auth/popup-closed-by-user') return 'Google sign-in was cancelled.'
     if (cause?.code === 'auth/network-request-failed') return 'Unable to reach Google sign-in. Check your connection and try again.'
+    if (cause?.code === 'auth/unauthorized-domain') {
+      return 'Google sign-in is not enabled for this web address. Use the production HRFlow address or contact an administrator.'
+    }
     if (cause?.code === 'auth/internal-error') {
       return 'Your browser blocked secure sign-in storage. Refresh the page or try a private window.'
     }

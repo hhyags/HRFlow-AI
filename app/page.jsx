@@ -1,8 +1,6 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { signOut } from 'firebase/auth'
-import { getFirebaseClientAuth } from '@/lib/firebase/client'
 import {
   Activity,
   BarChart3,
@@ -42,10 +40,10 @@ const navGroups = [
     label: 'Workspace',
     items: [
       { id: 'dashboard', label: 'Overview', icon: LayoutDashboard },
-      { id: 'employees', label: 'People', icon: Users, badge: '248' },
-      { id: 'recruitment', label: 'Recruitment', icon: BriefcaseBusiness, badge: '12' },
+      { id: 'employees', label: 'People', icon: Users },
+      { id: 'recruitment', label: 'Recruitment', icon: BriefcaseBusiness },
       { id: 'attendance', label: 'Time & attendance', icon: Clock3 },
-      { id: 'leave', label: 'Leave', icon: CalendarDays, badge: '5' },
+      { id: 'leave', label: 'Leave', icon: CalendarDays },
     ],
   },
   {
@@ -58,30 +56,6 @@ const navGroups = [
     ],
   },
 ]
-
-const demoEmployees = [
-  { name: 'Sarah Chen', role: 'Senior Product Designer', dept: 'Design', status: 'Active', avatar: 'SC', color: '#ec4899' },
-  { name: 'Marcus Johnson', role: 'Frontend Engineer', dept: 'Engineering', status: 'Active', avatar: 'MJ', color: '#6366f1' },
-  { name: 'Elena Rodriguez', role: 'People Operations Lead', dept: 'People', status: 'Remote', avatar: 'ER', color: '#8b5cf6' },
-  { name: 'David Kim', role: 'Product Manager', dept: 'Product', status: 'Active', avatar: 'DK', color: '#0ea5e9' },
-  { name: 'Aisha Patel', role: 'Growth Marketing Manager', dept: 'Marketing', status: 'On leave', avatar: 'AP', color: '#f59e0b' },
-]
-
-const demoCandidates = {
-  Applied: [
-    { name: 'Maya Brooks', role: 'Product Designer', score: 92, avatar: 'MB' },
-    { name: 'Noah Williams', role: 'Frontend Engineer', score: 86, avatar: 'NW' },
-  ],
-  Screening: [
-    { name: 'James Liu', role: 'Product Designer', score: 96, avatar: 'JL' },
-    { name: 'Priya Nair', role: 'Data Analyst', score: 89, avatar: 'PN' },
-  ],
-  Interview: [
-    { name: 'Olivia Smith', role: 'People Partner', score: 94, avatar: 'OS' },
-    { name: 'Ethan Reed', role: 'Frontend Engineer', score: 88, avatar: 'ER' },
-  ],
-  Selected: [{ name: 'Liam Carter', role: 'Product Designer', score: 98, avatar: 'LC' }],
-}
 
 const moduleCopy = {
   attendance: ['Time & attendance', 'Track attendance, shifts, working hours, and overtime.'],
@@ -109,7 +83,7 @@ function Logo() {
   )
 }
 
-function Sidebar({ active, setActive, open, setOpen, compact, setCompact }) {
+function Sidebar({ active, setActive, open, setOpen, compact, setCompact, organizationName, badges }) {
   return (
     <>
       {open && <button className="backdrop" aria-label="Close menu" onClick={() => setOpen(false)} />}
@@ -119,9 +93,9 @@ function Sidebar({ active, setActive, open, setOpen, compact, setCompact }) {
           <button className="iconButton sidebarClose" onClick={() => setOpen(false)}><X size={18} /></button>
         </div>
 
-        <button className="orgSwitcher">
-          <span className="orgIcon">AC</span>
-          <span className="orgText"><b>Acme Corporation</b><small>Business plan</small></span>
+        <button className="orgSwitcher" onClick={() => setActive('settings')}>
+          <span className="orgIcon">{organizationName.split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase()}</span>
+          <span className="orgText"><b>{organizationName}</b><small>Organization workspace</small></span>
           <ChevronDown size={15} />
         </button>
 
@@ -140,7 +114,7 @@ function Sidebar({ active, setActive, open, setOpen, compact, setCompact }) {
                   >
                     <Icon size={18} strokeWidth={1.8} />
                     <span>{item.label}</span>
-                    {item.badge && <em>{item.badge}</em>}
+                    {badges[item.id] > 0 && <em>{badges[item.id]}</em>}
                   </button>
                 )
               })}
@@ -165,23 +139,36 @@ function Sidebar({ active, setActive, open, setOpen, compact, setCompact }) {
   )
 }
 
-function Header({ setOpen, dark, setDark, logout }) {
+function Header({ setOpen, dark, setDark, search, setSearch, setActive, notifications, profile }) {
+  const fullName = profile?.fullName || profile?.email || 'HRFlow user'
+  const initials = fullName.split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase()
+  const roleLabel = (profile?.role || 'EMPLOYEE').toLowerCase().replace('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase())
   return (
     <header className="header">
       <button className="iconButton mobileMenu" onClick={() => setOpen(true)}><Menu size={20} /></button>
       <div className="globalSearch">
         <Search size={17} />
-        <input aria-label="Global search" placeholder="Search people, jobs, reports..." />
+        <input
+          aria-label="Global search"
+          placeholder="Search people, jobs, reports..."
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' && search.trim()) setActive('employees')
+          }}
+        />
         <kbd>⌘ K</kbd>
       </div>
       <div className="headerActions">
         <button className="iconButton" onClick={() => setDark(!dark)} aria-label="Toggle theme">
           {dark ? <Sun size={18} /> : <Moon size={18} />}
         </button>
-        <button className="iconButton notification"><Bell size={18} /><span /></button>
-        <button className="profileButton" onClick={logout} title="Sign out">
-          <Avatar initials="GS" color="#4f46e5" small />
-          <span><b>Goutham Sai</b><small>HR Administrator</small></span>
+        <button className="iconButton notification" onClick={() => setActive('notifications')} aria-label="Notifications">
+          <Bell size={18} />{notifications > 0 && <span />}
+        </button>
+        <button className="profileButton" type="button" onClick={() => window.location.assign('/api/auth/logout')} title="Sign out">
+          <Avatar initials={initials} color="#4f46e5" small />
+          <span><b>{fullName}</b><small>{roleLabel}</small></span>
           <ChevronDown size={14} />
         </button>
       </div>
@@ -202,13 +189,163 @@ function PageHeading({ eyebrow, title, description, children }) {
   )
 }
 
+const actionFields = {
+  employee: [
+    ['employeeNumber', 'Employee number', 'text'],
+    ['firstName', 'First name', 'text'],
+    ['lastName', 'Last name', 'text'],
+    ['email', 'Work email', 'email'],
+    ['jobTitle', 'Job title', 'text'],
+    ['joiningDate', 'Joining date', 'date'],
+    ['salary', 'Monthly salary', 'number'],
+    ['location', 'Location', 'text'],
+  ],
+  job: [
+    ['title', 'Job title', 'text'],
+    ['description', 'Job description', 'textarea'],
+    ['location', 'Location', 'text'],
+    ['openings', 'Openings', 'number'],
+  ],
+  candidate: [
+    ['firstName', 'First name', 'text'],
+    ['lastName', 'Last name', 'text'],
+    ['email', 'Email', 'email'],
+    ['phone', 'Phone', 'text'],
+    ['jobId', 'Job ID (optional)', 'text'],
+  ],
+  attendance: [
+    ['employeeId', 'Employee ID', 'text'],
+    ['date', 'Date', 'date'],
+    ['workMinutes', 'Work minutes', 'number'],
+    ['overtimeMinutes', 'Overtime minutes', 'number'],
+  ],
+  leave: [
+    ['employeeId', 'Employee ID', 'text'],
+    ['startDate', 'Start date', 'date'],
+    ['endDate', 'End date', 'date'],
+    ['days', 'Days', 'number'],
+    ['reason', 'Reason', 'textarea'],
+  ],
+  payroll: [
+    ['employeeId', 'Employee ID', 'text'],
+    ['periodStart', 'Period start', 'date'],
+    ['periodEnd', 'Period end', 'date'],
+    ['baseSalary', 'Base salary', 'number'],
+    ['bonus', 'Bonus', 'number'],
+    ['deductions', 'Deductions', 'number'],
+    ['netPay', 'Net pay', 'number'],
+  ],
+  review: [
+    ['employeeId', 'Employee ID', 'text'],
+    ['period', 'Review period', 'text'],
+    ['rating', 'Rating (0-5)', 'number'],
+    ['goalsScore', 'Goals score (0-100)', 'number'],
+    ['feedback', 'Feedback', 'textarea'],
+  ],
+  invitation: [
+    ['email', 'Work email', 'email'],
+    ['role', 'Access role', 'select'],
+  ],
+}
+
+const actionResource = {
+  employee: 'employees',
+  job: 'jobs',
+  candidate: 'candidates',
+  attendance: 'attendance',
+  leave: 'leave',
+  payroll: 'payroll',
+  review: 'reviews',
+}
+
+function ActionModal({ action, close, onSaved, role }) {
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+  if (!action) return null
+
+  async function submit(event) {
+    event.preventDefault()
+    setBusy(true)
+    setError('')
+    const form = Object.fromEntries(new FormData(event.currentTarget))
+    const numeric = new Set(['salary', 'openings', 'workMinutes', 'overtimeMinutes', 'days', 'baseSalary', 'bonus', 'deductions', 'netPay', 'rating', 'goalsScore'])
+    for (const key of numeric) {
+      if (form[key] !== undefined && form[key] !== '') form[key] = Number(form[key])
+    }
+    if (action.type === 'job') form.status = 'OPEN'
+    if (action.type === 'candidate') form.skills = []
+    if (action.type === 'attendance') form.status = 'PRESENT'
+    if (action.type === 'leave') form.type = 'CASUAL'
+    if (action.type === 'payroll') form.status = 'DRAFT'
+
+    try {
+      const endpoint = action.type === 'invitation'
+        ? '/api/auth/invitations'
+        : `/api/${actionResource[action.type]}`
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      })
+      const body = await response.json()
+      if (!response.ok) throw new Error(body.error || 'Unable to save this record.')
+      await onSaved(action.type, body.data)
+      close()
+    } catch (cause) {
+      setError(cause.message || 'Unable to save this record.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="modalBackdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && close()}>
+      <div className="modalCard" role="dialog" aria-modal="true" aria-labelledby="action-title">
+        <div className="modalHead">
+          <div><p>HRFlow workspace</p><h2 id="action-title">{action.title}</h2></div>
+          <button className="iconButton" onClick={close} aria-label="Close"><X size={18} /></button>
+        </div>
+        <form className="modalForm" onSubmit={submit}>
+          {error && <p className="formError">{error}</p>}
+          {actionFields[action.type]
+            .filter(([name]) => !(action.type === 'leave' && role === 'EMPLOYEE' && name === 'employeeId'))
+            .map(([name, label, type]) => (
+            <label key={name}>{label}
+              {type === 'textarea'
+                ? <textarea name={name} required={name === 'description' || name === 'reason'} />
+                : type === 'select'
+                  ? <select name={name} defaultValue="EMPLOYEE"><option value="EMPLOYEE">Employee</option><option value="RECRUITER">Recruiter</option></select>
+                  : <input name={name} type={type} required={!label.includes('optional') && !['salary', 'location', 'phone', 'bonus', 'deductions', 'goalsScore'].includes(name)} />}
+            </label>
+            ))}
+          <div className="modalActions">
+            <button type="button" className="button secondary" onClick={close}>Cancel</button>
+            <button className="button primary" disabled={busy}>{busy ? 'Saving...' : 'Save'}</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+function downloadCsv(name, rows) {
+  if (!rows?.length) return
+  const headers = Object.keys(rows[0])
+  const escape = (value) => `"${String(value ?? '').replaceAll('"', '""')}"`
+  const csv = [headers.join(','), ...rows.map((row) => headers.map((key) => escape(row[key])).join(','))].join('\n')
+  const link = document.createElement('a')
+  link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }))
+  link.download = `${name}-${new Date().toISOString().slice(0, 10)}.csv`
+  link.click()
+  URL.revokeObjectURL(link.href)
+}
+
 function MetricCard({ label, value, change, icon: Icon, tone, note }) {
   return (
     <div className="card metricCard">
       <div className={`metricIcon ${tone}`}><Icon size={19} /></div>
       <div className="metricTop">
         <span>{label}</span>
-        <button className="moreButton"><MoreHorizontal size={18} /></button>
       </div>
       <strong>{value}</strong>
       <div className="metricFoot">
@@ -220,7 +357,7 @@ function MetricCard({ label, value, change, icon: Icon, tone, note }) {
 }
 
 function GrowthChart({ values }) {
-  const chartValues = values?.length === 12 ? values : [58, 67, 91, 101, 98, 142, 139, 176, 190, 207, 205, 248]
+  const chartValues = values?.length === 12 ? values : Array(12).fill(0)
   const max = Math.max(...chartValues, 1)
   const min = Math.min(...chartValues, 0)
   const range = Math.max(max - min, 1)
@@ -250,15 +387,28 @@ function GrowthChart({ values }) {
   )
 }
 
-function Dashboard({ data }) {
-  const totalEmployees = data?.totalEmployees ?? 248
-  const activeEmployees = data?.activeEmployees ?? 219
-  const openJobs = data?.openJobs ?? 12
-  const monthlyPayroll = data ? `$${(data.monthlyPayroll / 1000).toFixed(1)}K` : '$1.24M'
-  const attendance = data?.attendance || { PRESENT: 219, LATE: 12, ABSENT: 17 }
+function Dashboard({ data, employees, setActive, openAction, profile, canManage }) {
+  const now = new Date()
+  const dateHeading = new Intl.DateTimeFormat('en-US', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+    timeZone: 'UTC',
+  }).format(now)
+  const dateShort = new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    timeZone: 'UTC',
+  }).format(now)
+  const totalEmployees = data?.totalEmployees ?? 0
+  const activeEmployees = data?.activeEmployees ?? 0
+  const openJobs = data?.openJobs ?? 0
+  const monthlyPayroll = `$${((data?.monthlyPayroll || 0) / 1000).toFixed(1)}K`
+  const attendance = data?.attendance || {}
   const attendanceTotal = Object.values(attendance).reduce((sum, value) => sum + value, 0)
   const attendanceRate = attendanceTotal ? Math.round(((attendance.PRESENT || 0) / attendanceTotal) * 100) : 0
-  const recruitment = data?.recruitment || { APPLIED: 48, SCREENING: 31, INTERVIEW: 18, SELECTED: 8, REJECTED: 5 }
+  const recruitment = data?.recruitment || {}
   const funnelRows = [
     ['Applied', recruitment.APPLIED || 0],
     ['Screening', recruitment.SCREENING || 0],
@@ -274,44 +424,39 @@ function Dashboard({ data }) {
         `${employee.firstName} ${employee.lastName} joined the ${employee.department?.name || 'team'} directory`,
         new Date(employee.createdAt).toLocaleDateString(),
       ])
-    : [
-        ['SC', '#ec4899', 'Sarah Chen submitted a leave request', '2 min ago'],
-        ['MJ', '#6366f1', 'Marcus Johnson completed a performance review', '18 min ago'],
-        ['ER', '#8b5cf6', 'Elena Rodriguez added a new candidate', '42 min ago'],
-        ['DK', '#0ea5e9', 'David Kim updated a company policy', '1 hr ago'],
-      ]
+    : []
   return (
     <>
       <PageHeading
-        eyebrow="Friday, June 5"
-        title="Good morning, Goutham"
+        eyebrow={dateHeading}
+        title={`Welcome, ${(profile?.fullName || profile?.email || 'HRFlow user').split(' ')[0]}`}
         description="Here’s what’s happening with your organization today."
       >
-        <button className="button secondary"><Upload size={16} /> Export</button>
-        <button className="button primary"><Plus size={16} /> Add employee</button>
+        <button className="button secondary" onClick={() => downloadCsv('employees', employees || [])}><Upload size={16} /> Export</button>
+        {canManage && <button className="button primary" onClick={() => openAction('employee', 'Add employee')}><Plus size={16} /> Add employee</button>}
       </PageHeading>
 
       <section className="metricsGrid">
-        <MetricCard label="Total employees" value={totalEmployees} change="+12.5%" note="vs last month" icon={Users} tone="indigo" />
+        <MetricCard label="Total employees" value={totalEmployees} change="" note="organization headcount" icon={Users} tone="indigo" />
         <MetricCard label="Active today" value={activeEmployees} change={`${attendanceRate}%`} note="attendance rate" icon={Activity} tone="green" />
-        <MetricCard label="Open positions" value={openJobs} change="+3" note="this month" icon={BriefcaseBusiness} tone="purple" />
-        <MetricCard label="Monthly payroll" value={monthlyPayroll} change="+4.2%" note="vs last month" icon={CircleDollarSign} tone="amber" />
+        <MetricCard label="Open positions" value={openJobs} change="" note="currently recruiting" icon={BriefcaseBusiness} tone="purple" />
+        <MetricCard label="Monthly payroll" value={monthlyPayroll} change="" note="current period" icon={CircleDollarSign} tone="amber" />
       </section>
 
       <section className="dashboardGrid">
         <div className="card growthCard">
           <div className="cardHeader">
             <div><h2>Employee growth</h2><p>Headcount over the past 12 months</p></div>
-            <button className="selectButton">Last 12 months <ChevronDown size={14} /></button>
+            <button className="selectButton" onClick={() => setActive('analytics')}>Last 12 months <ChevronRight size={14} /></button>
           </div>
-          <div className="growthSummary"><strong>{totalEmployees}</strong><span><TrendingUp size={14} /> 18.4%</span><small>Employee headcount</small></div>
+          <div className="growthSummary"><strong>{totalEmployees}</strong><span><TrendingUp size={14} /> Live</span><small>Employee headcount</small></div>
           <GrowthChart values={data?.employeeGrowth} />
         </div>
 
         <div className="card attendanceCard">
           <div className="cardHeader">
-            <div><h2>Attendance today</h2><p>June 5, 2026</p></div>
-            <button className="moreButton"><MoreHorizontal size={18} /></button>
+            <div><h2>Attendance today</h2><p>{dateShort}</p></div>
+            <button className="moreButton" onClick={() => setActive('attendance')} aria-label="Open attendance"><ChevronRight size={18} /></button>
           </div>
           <div className="donutWrap">
             <div className="donut" style={{ background: `conic-gradient(var(--primary) 0 ${attendanceRate}%, var(--border) ${attendanceRate}%)` }}><span><strong>{attendanceRate}%</strong><small>On time</small></span></div>
@@ -321,7 +466,7 @@ function Dashboard({ data }) {
             <div><i className="amberDot" /><span>Late</span><strong>{attendance.LATE || 0}</strong></div>
             <div><i className="redDot" /><span>Absent</span><strong>{attendance.ABSENT || 0}</strong></div>
           </div>
-          <button className="textButton">View attendance report <ChevronRight size={15} /></button>
+          <button className="textButton" onClick={() => setActive('attendance')}>View attendance report <ChevronRight size={15} /></button>
         </div>
       </section>
 
@@ -329,7 +474,7 @@ function Dashboard({ data }) {
         <div className="card recruitmentCard">
           <div className="cardHeader">
             <div><h2>Recruitment pipeline</h2><p>{Object.values(recruitment).reduce((sum, count) => sum + count, 0)} candidates across {openJobs} open roles</p></div>
-            <button className="textButton topLink">View all <ChevronRight size={15} /></button>
+            <button className="textButton topLink" onClick={() => setActive('recruitment')}>View all <ChevronRight size={15} /></button>
           </div>
           <div className="funnel">
             {funnelRows.map(([label, count], i) => (
@@ -348,13 +493,13 @@ function Dashboard({ data }) {
           </div>
           <div className="insightItem">
             <span className="insightIcon warning"><TrendingUp size={16} /></span>
-            <div><b>Engineering attrition risk is rising</b><p>3 high-performing employees show indicators of disengagement.</p><button>View analysis</button></div>
+            <div><b>Workforce risk analysis</b><p>Generate an evidence-based attrition assessment from current organization data.</p><button onClick={() => setActive('analytics')}>View analysis</button></div>
           </div>
           <div className="insightItem">
             <span className="insightIcon success"><Check size={16} /></span>
-            <div><b>Hiring velocity improved by 18%</b><p>Average time-to-hire dropped from 32 to 26 days this quarter.</p><button>View report</button></div>
+            <div><b>Hiring performance report</b><p>Review current candidates, open roles, and recruitment recommendations.</p><button onClick={() => setActive('analytics')}>View report</button></div>
           </div>
-          <button className="askButton"><Sparkles size={15} /> Ask HR Copilot anything <ChevronRight size={15} /></button>
+          <button className="askButton" onClick={() => setActive('copilot')}><Sparkles size={15} /> Ask HR Copilot anything <ChevronRight size={15} /></button>
         </div>
 
         <div className="card activityCard">
@@ -363,6 +508,7 @@ function Dashboard({ data }) {
             {recentActivity.map(([avatar, color, text, time]) => (
               <div className="activityRow" key={text}><Avatar initials={avatar} color={color} small /><div><p>{text}</p><small>{time}</small></div></div>
             ))}
+            {!recentActivity.length && <div className="emptyState"><Activity size={22} /><p>No recent employee activity.</p></div>}
           </div>
         </div>
       </section>
@@ -370,36 +516,44 @@ function Dashboard({ data }) {
   )
 }
 
-function EmployeesPage({ employees = demoEmployees }) {
-  const [query, setQuery] = useState('')
+function EmployeesPage({ employees = [], initialQuery = '', openAction, canManage, leaveRows = [] }) {
+  const [query, setQuery] = useState(initialQuery)
+  useEffect(() => setQuery(initialQuery), [initialQuery])
   const filtered = useMemo(() => employees.filter((e) => `${e.name} ${e.role} ${e.dept}`.toLowerCase().includes(query.toLowerCase())), [employees, query])
+  const departments = new Set(employees.map((employee) => employee.dept).filter((department) => department && department !== 'Unassigned')).size
+  const monthStart = new Date()
+  monthStart.setDate(1)
+  monthStart.setHours(0, 0, 0, 0)
+  const newJoiners = employees.filter((employee) => employee.joiningDateRaw && new Date(employee.joiningDateRaw) >= monthStart).length
+  const now = new Date()
+  const onLeave = leaveRows.filter((request) => request.status === 'APPROVED' && new Date(request.startDate) <= now && new Date(request.endDate) >= now).length
   return (
     <>
       <PageHeading title="People" description="Manage your employee directory, profiles, and employment information.">
-        <button className="button secondary"><Upload size={16} /> Import</button>
-        <button className="button primary"><UserPlus size={16} /> Add employee</button>
+        <button className="button secondary" onClick={() => downloadCsv('employees', employees)}><Upload size={16} /> Export</button>
+        {canManage && <button className="button primary" onClick={() => openAction('employee', 'Add employee')}><UserPlus size={16} /> Add employee</button>}
       </PageHeading>
       <div className="statStrip">
         <div><span>Total employees</span><strong>{employees.length}</strong><small className="positive">Live directory</small></div>
-        <div><span>Departments</span><strong>8</strong><small>Across 4 locations</small></div>
-        <div><span>New joiners</span><strong>12</strong><small>This month</small></div>
-        <div><span>On leave</span><strong>7</strong><small>Today</small></div>
+        <div><span>Departments</span><strong>{departments}</strong><small>Represented in directory</small></div>
+        <div><span>New joiners</span><strong>{newJoiners}</strong><small>This month</small></div>
+        <div><span>On leave</span><strong>{onLeave}</strong><small>Today</small></div>
       </div>
       <div className="card tableCard">
         <div className="tableTools">
           <div className="tableSearch"><Search size={16} /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search employees..." /></div>
-          <button className="button secondary"><Filter size={15} /> Filters</button>
-          <button className="button secondary">All departments <ChevronDown size={14} /></button>
+          <button className="button secondary" onClick={() => setQuery('')}><Filter size={15} /> Clear filters</button>
+          <button className="button secondary" onClick={() => downloadCsv('employees', filtered)}>Export visible</button>
         </div>
         <div className="employeeTable">
           <div className="tableRow tableHead"><span>Employee</span><span>Department</span><span>Status</span><span>Join date</span><span /></div>
-          {filtered.map((employee, index) => (
+          {filtered.map((employee) => (
             <div className="tableRow" key={employee.name}>
               <div className="employeeCell"><Avatar initials={employee.avatar} color={employee.color} /><span><b>{employee.name}</b><small>{employee.role}</small></span></div>
               <span>{employee.dept}</span>
               <span><i className={`statusPill ${employee.status.toLowerCase().replace(' ', '')}`}>{employee.status}</i></span>
-              <span>{employee.joiningDate || ['Mar 14, 2023', 'Jul 08, 2024', 'Jan 22, 2022', 'Sep 18, 2023', 'Feb 03, 2025'][index % 5]}</span>
-              <button className="moreButton"><MoreHorizontal size={18} /></button>
+              <span>{employee.joiningDate || 'Not set'}</span>
+              <button className="moreButton" onClick={() => navigator.clipboard.writeText(employee.id || employee.name)} title="Copy employee ID"><MoreHorizontal size={18} /></button>
             </div>
           ))}
         </div>
@@ -408,39 +562,48 @@ function EmployeesPage({ employees = demoEmployees }) {
   )
 }
 
-function RecruitmentPage({ candidates = demoCandidates, openJobs = 12 }) {
+function RecruitmentPage({ candidates = {}, openJobs = 0, openAction, canRecruit }) {
+  const [query, setQuery] = useState('')
   const activeCandidates = Object.values(candidates).flat().length
+  const filteredCandidates = Object.fromEntries(Object.entries(candidates).map(([stage, cards]) => [
+    stage,
+    cards.filter((candidate) => `${candidate.name} ${candidate.role}`.toLowerCase().includes(query.toLowerCase())),
+  ]))
+  const scoredCandidates = Object.values(candidates).flat().filter((candidate) => Number.isFinite(candidate.score))
+  const averageScore = scoredCandidates.length
+    ? Math.round(scoredCandidates.reduce((sum, candidate) => sum + candidate.score, 0) / scoredCandidates.length)
+    : 0
   return (
     <>
       <PageHeading title="Recruitment" description="Move great candidates from application to offer, faster.">
-        <button className="button secondary"><Users size={16} /> Candidates</button>
-        <button className="button primary"><Plus size={16} /> Create job</button>
+        <button className="button secondary" onClick={() => downloadCsv('candidates', Object.values(candidates).flat())}><Users size={16} /> Export candidates</button>
+        {canRecruit && <button className="button primary" onClick={() => openAction('job', 'Create job')}><Plus size={16} /> Create job</button>}
       </PageHeading>
       <div className="pipelineSummary">
         <div><BriefcaseBusiness size={18} /><span><strong>{openJobs}</strong> Open jobs</span></div>
         <div><Users size={18} /><span><strong>{activeCandidates}</strong> Active candidates</span></div>
-        <div><Clock3 size={18} /><span><strong>26 days</strong> Avg. time to hire</span></div>
-        <div><Sparkles size={18} /><span><strong>91%</strong> AI match accuracy</span></div>
+        <div><Clock3 size={18} /><span><strong>{activeCandidates}</strong> Candidates in pipeline</span></div>
+        <div><Sparkles size={18} /><span><strong>{averageScore}%</strong> Average AI score</span></div>
       </div>
       <div className="kanbanTools">
-        <div className="tableSearch"><Search size={16} /><input placeholder="Search candidates..." /></div>
-        <button className="button secondary"><Filter size={15} /> Filter</button>
-        <button className="button secondary">All jobs <ChevronDown size={14} /></button>
+        <div className="tableSearch"><Search size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search candidates..." /></div>
+        <button className="button secondary" onClick={() => setQuery('')}><Filter size={15} /> Clear</button>
+        {canRecruit && <button className="button secondary" onClick={() => openAction('candidate', 'Add candidate')}>Add candidate</button>}
       </div>
       <div className="kanban">
-        {Object.entries(candidates).map(([stage, cards], stageIndex) => (
+        {Object.entries(filteredCandidates).map(([stage, cards], stageIndex) => (
           <div className="kanbanColumn" key={stage}>
             <div className="kanbanHead"><span><i className={`stageDot stage${stageIndex}`} />{stage}</span><em>{cards.length}</em><MoreHorizontal size={17} /></div>
             {cards.map((candidate) => (
               <div className="candidateCard" key={candidate.name}>
-                <div className="candidateTop"><Avatar initials={candidate.avatar} color={['#6366f1', '#8b5cf6', '#0ea5e9'][candidate.score % 3]} /><button className="moreButton"><MoreHorizontal size={16} /></button></div>
+                <div className="candidateTop"><Avatar initials={candidate.avatar} color={['#6366f1', '#8b5cf6', '#0ea5e9'][candidate.score % 3]} /><button className="moreButton" onClick={() => navigator.clipboard.writeText(candidate.id)} title="Copy candidate ID"><MoreHorizontal size={16} /></button></div>
                 <b>{candidate.name}</b><p>{candidate.role}</p>
                 <div className="candidateMeta"><span><Sparkles size={13} /> AI score</span><strong>{candidate.score}%</strong></div>
                 <div className="scoreBar"><i style={{ width: `${candidate.score}%` }} /></div>
-                <small>Applied {candidate.score % 2 ? '2 days' : '5 hours'} ago</small>
+                <small>Applied {candidate.appliedAt ? new Date(candidate.appliedAt).toLocaleDateString() : 'date unavailable'}</small>
               </div>
             ))}
-            <button className="addCandidate"><Plus size={15} /> Add candidate</button>
+            {canRecruit && <button className="addCandidate" onClick={() => openAction('candidate', `Add ${stage} candidate`)}><Plus size={15} /> Add candidate</button>}
           </div>
         ))}
       </div>
@@ -449,96 +612,219 @@ function RecruitmentPage({ candidates = demoCandidates, openJobs = 12 }) {
 }
 
 function CopilotPage() {
-  const [messages, setMessages] = useState([{ type: 'ai', text: 'Good morning, Goutham. I’m ready to help with your people, recruiting, attendance, or workforce planning.' }])
+  const initialMessage = { type: 'ai', text: 'I am ready to help with your people, recruiting, attendance, payroll, and workforce planning.' }
+  const [messages, setMessages] = useState([initialMessage])
   const [text, setText] = useState('')
-  const send = (value = text) => {
-    if (!value.trim()) return
-    setMessages((current) => [...current, { type: 'user', text: value }, { type: 'ai', text: 'I’ve analyzed your workspace data. Attendance is stable at 88.3%, hiring velocity is up 18%, and three employees in Engineering may benefit from a manager check-in.' }])
+  const [busy, setBusy] = useState(false)
+
+  async function send(value = text) {
+    if (!value.trim() || busy) return
+    const history = messages.slice(-10).map((message) => ({
+      role: message.type === 'ai' ? 'assistant' : 'user',
+      content: message.text,
+    }))
+    setMessages((current) => [...current, { type: 'user', text: value }])
     setText('')
+    setBusy(true)
+    try {
+      const response = await fetch('/api/ai/hr-copilot', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: value, history }),
+      })
+      const body = await response.json()
+      setMessages((current) => [...current, {
+        type: 'ai',
+        text: response.ok
+          ? body.data.answer
+          : `${body.error || 'HR Copilot is temporarily unavailable.'} Your HR records remain available.`,
+      }])
+    } catch {
+      setMessages((current) => [...current, { type: 'ai', text: 'HR Copilot is temporarily unavailable. Your HR records remain available.' }])
+    } finally {
+      setBusy(false)
+    }
   }
+
   return (
     <div className="copilotPage">
       <div className="chatHistory">
-        <button className="button primary newChat"><Plus size={16} /> New chat</button>
-        <p>Recent</p>
-        {['Monthly workforce summary', 'Engineering attrition risk', 'Q2 hiring performance', 'Leave policy questions'].map((item, i) => (
-          <button key={item} className={i === 0 ? 'selected' : ''}><MessageSquareText size={16} /><span>{item}</span><MoreHorizontal size={15} /></button>
+        <button className="button primary newChat" onClick={() => setMessages([initialMessage])}><Plus size={16} /> New chat</button>
+        <p>Suggested reports</p>
+        {['Monthly workforce summary', 'Engineering attrition risk', 'Q2 hiring performance', 'Leave policy questions'].map((item) => (
+          <button key={item} onClick={() => send(item)}><MessageSquareText size={16} /><span>{item}</span><ChevronRight size={15} /></button>
         ))}
       </div>
       <div className="chatMain">
-        <div className="chatTitle"><span className="aiIcon large"><Bot size={20} /></span><div><h1>HR Copilot</h1><p>AI-powered answers grounded in your organization’s data</p></div><span className="liveBadge"><i /> Online</span></div>
+        <div className="chatTitle"><span className="aiIcon large"><Bot size={20} /></span><div><h1>HR Copilot</h1><p>Answers grounded in current organization data</p></div><span className="liveBadge"><i /> Online</span></div>
         <div className="chatMessages">
-          {messages.length === 1 && (
-            <div className="promptGrid">
-              {['Show employees with attendance issues', 'Generate the monthly HR report', 'Analyze our hiring performance', 'Recommend promotion candidates'].map((prompt) => (
-                <button onClick={() => send(prompt)} key={prompt}><Sparkles size={17} /><span>{prompt}</span><ChevronRight size={15} /></button>
-              ))}
-            </div>
-          )}
-          {messages.map((message, i) => (
-            <div className={`message ${message.type}`} key={`${message.text}-${i}`}>
-              {message.type === 'ai' ? <span className="aiIcon"><Sparkles size={16} /></span> : <Avatar initials="GS" color="#4f46e5" small />}
+          {messages.length === 1 && <div className="promptGrid">
+            {['Show employees with attendance issues', 'Generate the monthly HR report', 'Analyze our hiring performance', 'Recommend workforce actions'].map((prompt) => (
+              <button onClick={() => send(prompt)} key={prompt}><Sparkles size={17} /><span>{prompt}</span><ChevronRight size={15} /></button>
+            ))}
+          </div>}
+          {messages.map((message, index) => (
+            <div className={`message ${message.type}`} key={`${message.text}-${index}`}>
+              {message.type === 'ai' ? <span className="aiIcon"><Sparkles size={16} /></span> : <Avatar initials="ME" color="#4f46e5" small />}
               <p>{message.text}</p>
             </div>
           ))}
         </div>
         <div className="chatComposer">
-          <textarea value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }} placeholder="Ask about your people, hiring, attendance, or payroll..." />
-          <div><span>HRFlow AI can make mistakes. Review important insights.</span><button onClick={() => send()}><Sparkles size={17} /></button></div>
+          <textarea value={text} disabled={busy} onChange={(event) => setText(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); send() } }} placeholder={busy ? 'Analyzing organization data...' : 'Ask about your people, hiring, attendance, or payroll...'} />
+          <div><span>Review important AI-generated insights.</span><button disabled={busy} onClick={() => send()}><Sparkles size={17} /></button></div>
         </div>
       </div>
       <div className="reportPanel">
         <p>Generated reports</p>
-        <div className="reportPreview"><FileText size={24} /><b>Monthly HR Summary</b><span>May 2026 · 12 pages</span><button>Open report</button></div>
-        <div className="reportPreview"><BarChart3 size={24} /><b>Hiring Performance</b><span>Q2 2026 · 8 pages</span><button>Open report</button></div>
+        <div className="reportPreview"><FileText size={24} /><b>Monthly HR Summary</b><span>Current organization data</span><button onClick={() => send('Generate the monthly HR report')}>Generate report</button></div>
+        <div className="reportPreview"><BarChart3 size={24} /><b>Hiring Performance</b><span>Current recruitment data</span><button onClick={() => send('Analyze our hiring performance')}>Generate report</button></div>
       </div>
     </div>
   )
 }
 
-function ModulePage({ type }) {
-  const [title, description] = moduleCopy[type] || ['Settings', 'Manage your organization, security, roles, and AI preferences.']
-  const Icon = navGroups.flatMap((g) => g.items).find((item) => item.id === type)?.icon || Settings
-  return (
-    <>
-      <PageHeading title={title} description={description}>
-        <button className="button secondary"><Upload size={16} /> Export</button>
-        <button className="button primary"><Plus size={16} /> Create new</button>
+function ModulePage({ type, rows = [], openAction, setActive, refresh, role }) {
+  const [title, description] = moduleCopy[type] || [type === 'notifications' ? 'Notifications' : 'Settings', type === 'notifications' ? 'Review alerts and activity across your workspace.' : 'Manage organization access, security, and integrations.']
+  const Icon = navGroups.flatMap((group) => group.items).find((item) => item.id === type)?.icon || (type === 'notifications' ? Bell : Settings)
+  const [analysis, setAnalysis] = useState('')
+  const [busy, setBusy] = useState(false)
+  const createTypes = role === 'HR_MANAGER'
+    ? { attendance: 'attendance', leave: 'leave', payroll: 'payroll', performance: 'review', settings: 'invitation' }
+    : role === 'EMPLOYEE'
+      ? { leave: 'leave' }
+      : {}
+
+  async function generateAnalysis() {
+    setBusy(true)
+    try {
+      const response = await fetch('/api/ai/analytics', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: type === 'analytics' ? 'WORKFORCE_PLANNING' : 'ATTRITION_RISK', horizonMonths: 6 }),
+      })
+      const body = await response.json()
+      setAnalysis(response.ok ? body.data.executiveSummary : body.error || 'AI insights are temporarily unavailable.')
+    } catch {
+      setAnalysis('AI insights are temporarily unavailable. Existing records remain available.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function markRead(id) {
+    await fetch(`/api/notifications/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ read: true }),
+    })
+    refresh()
+  }
+
+  function uploadDocument() {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = '.pdf,.docx,.png,.jpg,.jpeg'
+    input.onchange = async () => {
+      const file = input.files?.[0]
+      if (!file) return
+      const form = new FormData()
+      form.set('file', file)
+      form.set('category', 'general')
+      const response = await fetch('/api/uploads', { method: 'POST', body: form })
+      const body = await response.json()
+      if (!response.ok) window.alert(body.error || 'Upload failed.')
+      refresh()
+    }
+    input.click()
+  }
+
+  if (type === 'settings') {
+    return <>
+      <PageHeading title="Settings" description={description}>
+        {role === 'HR_MANAGER' && <button className="button primary" onClick={() => openAction('invitation', 'Invite team member')}><UserPlus size={16} /> Invite member</button>}
       </PageHeading>
-      <div className="moduleHero card">
-        <div className="moduleHeroIcon"><Icon size={28} /></div>
-        <div><span>HRFlow workspace</span><h2>{title} is ready for your team</h2><p>This module uses the same unified employee data, permissions, automations, and AI insights across your organization.</p></div>
-        <button className="button primary">Explore module <ChevronRight size={16} /></button>
-      </div>
       <div className="moduleGrid">
-        {['Overview', 'Pending actions', 'Recent activity'].map((label, i) => (
-          <div className="card moduleCard" key={label}><span>{label}</span><strong>{[type === 'payroll' ? '$1.24M' : '248', '12', '38'][i]}</strong><p>{['Updated a few moments ago', 'Requires your attention', 'Changes in the last 7 days'][i]}</p><div className={`miniBars mini${i}`}><i /><i /><i /><i /><i /><i /></div></div>
-        ))}
+        <div className="card moduleCard"><span>Authentication</span><strong>Firebase</strong><p>Email/password and Google authentication</p></div>
+        <div className="card moduleCard"><span>Tenant security</span><strong>RLS</strong><p>Organization-scoped database policies</p></div>
+        <div className="card moduleCard"><span>AI service</span><strong>Gemini</strong><p>Cached, rate-limited, and audited</p></div>
       </div>
-      <div className="card emptyModule"><div className="moduleHeroIcon"><Sparkles size={24} /></div><h2>AI insights built in</h2><p>Ask HR Copilot to summarize trends, flag risks, and generate a report from this module.</p><button className="button secondary"><Sparkles size={16} /> Ask Copilot</button></div>
     </>
-  )
+  }
+
+  return <>
+    <PageHeading title={title} description={description}>
+      <button className="button secondary" onClick={() => downloadCsv(type, rows)}><Upload size={16} /> Export</button>
+      {createTypes[type] && <button className="button primary" onClick={() => openAction(createTypes[type], `Create ${title} record`)}><Plus size={16} /> Create new</button>}
+      {type === 'documents' && role !== 'RECRUITER' && <button className="button primary" onClick={uploadDocument}><Upload size={16} /> Upload document</button>}
+    </PageHeading>
+    <div className="moduleGrid">
+      <div className="card moduleCard"><span>Total records</span><strong>{rows.length}</strong><p>Live organization data</p><div className="miniBars"><i /><i /><i /><i /><i /><i /></div></div>
+      <div className="card moduleCard"><span>Current module</span><strong>{title}</strong><p>Protected by organization RBAC</p><div className="miniBars mini1"><i /><i /><i /><i /><i /><i /></div></div>
+      <div className="card moduleCard"><span>Data status</span><strong>Live</strong><p>Loaded from production APIs</p><div className="miniBars mini2"><i /><i /><i /><i /><i /><i /></div></div>
+    </div>
+    <div className="card recordsCard">
+      {rows.length ? rows.slice(0, 50).map((row) => <div className="recordRow" key={row.id}>
+        <div className="moduleHeroIcon"><Icon size={18} /></div>
+        <div><b>{row.title || row.name || row.type || row.period || `${row.employee?.firstName || ''} ${row.employee?.lastName || ''}`.trim() || 'HRFlow record'}</b><p>{row.body || row.status || row.category || row.employee?.email || row.id}</p></div>
+        {type === 'payroll' && <a className="textButton" href={`/api/payroll-engine/payslip/${row.id}`} target="_blank">Payslip</a>}
+        {type === 'notifications' && row.status !== 'READ' && <button className="textButton" onClick={() => markRead(row.id)}>Mark read</button>}
+      </div>) : <div className="emptyState"><Icon size={24} /><h2>No records yet</h2><p>Create the first real record for this module.</p></div>}
+    </div>
+    <div className="card emptyModule"><div className="moduleHeroIcon"><Sparkles size={24} /></div><h2>AI insights</h2><p>{analysis || 'Generate an insight grounded in current organization data.'}</p><div className="headingActions"><button className="button secondary" disabled={busy} onClick={generateAnalysis}><Sparkles size={16} /> {busy ? 'Analyzing...' : 'Generate insight'}</button><button className="button secondary" onClick={() => setActive('copilot')}>Open Copilot</button></div></div>
+  </>
 }
 
-function useHrflowData() {
-  const [data, setData] = useState({ dashboard: null, employees: null, candidates: null })
+function useHrflowData(active) {
+  const [data, setData] = useState({
+    dashboard: null,
+    session: null,
+    employees: [],
+    candidates: {},
+    raw: {},
+  })
+  const [version, setVersion] = useState(0)
 
   useEffect(() => {
     let cancelled = false
 
     async function load() {
-      const responses = await Promise.allSettled([
+      const readResponse = async (response) => {
+        if (!response?.ok) return null
+        return (await response.json()).data
+      }
+      const session = await fetch('/api/auth/session', { credentials: 'include' })
+        .then(readResponse)
+        .catch(() => null)
+      if (cancelled) return
+      setData((current) => ({ ...current, session }))
+
+      const moduleEndpoints = {
+        attendance: '/api/attendance?limit=100',
+        leave: '/api/leave?limit=100',
+        payroll: '/api/payroll?limit=100',
+        performance: '/api/reviews?limit=100',
+        documents: '/api/documents',
+      }
+      const supplementalKey = active === 'employees' ? 'leave' : moduleEndpoints[active] ? active : null
+      const supplementalEndpoint = supplementalKey === 'leave'
+        ? '/api/leave?limit=100'
+        : moduleEndpoints[supplementalKey]
+      const requests = [
         fetch('/api/dashboard', { credentials: 'include' }),
         fetch('/api/employees?limit=100', { credentials: 'include' }),
         fetch('/api/candidates?limit=100', { credentials: 'include' }),
-      ])
+        fetch('/api/notifications', { credentials: 'include' }),
+      ]
+      if (supplementalEndpoint) requests.push(fetch(supplementalEndpoint, { credentials: 'include' }))
+      const responses = await Promise.allSettled(requests)
 
       const read = async (result) => {
         if (result.status !== 'fulfilled' || !result.value.ok) return null
         return (await result.value.json()).data
       }
 
-      const [dashboard, employeeRows, candidateRows] = await Promise.all(responses.map(read))
+      const [dashboard, employeeRows, candidateRows, notifications, supplementalRows] = await Promise.all(responses.map(read))
       if (cancelled) return
 
       const mappedEmployees = employeeRows?.map((employee, index) => ({
@@ -556,6 +842,7 @@ function useHrflowData() {
           day: '2-digit',
           year: 'numeric',
         }),
+        joiningDateRaw: employee.joiningDate,
       }))
 
       const groupedCandidates = candidateRows?.reduce((groups, candidate) => {
@@ -568,22 +855,30 @@ function useHrflowData() {
           role: candidate.job?.title || 'Open application',
           score: candidate.aiScore || 0,
           avatar: `${candidate.firstName[0]}${candidate.lastName[0]}`,
+          appliedAt: candidate.appliedAt,
         })
         return groups
-      }, {})
+      }, { Applied: [], Screening: [], Interview: [], Selected: [] })
 
-      setData({
+      setData((current) => ({
+        session,
         dashboard,
-        employees: mappedEmployees?.length ? mappedEmployees : null,
-        candidates: groupedCandidates && Object.keys(groupedCandidates).length ? groupedCandidates : null,
-      })
+        employees: mappedEmployees || [],
+        candidates: groupedCandidates || {},
+        raw: {
+          ...current.raw,
+          ...(supplementalKey ? { [supplementalKey]: supplementalRows || [] } : {}),
+          analytics: current.raw.analytics || [],
+          notifications: notifications || [],
+        },
+      }))
     }
 
     load().catch(() => {})
     return () => { cancelled = true }
-  }, [])
+  }, [active, version])
 
-  return data
+  return { ...data, refresh: () => setVersion((current) => current + 1) }
 }
 
 export default function Home() {
@@ -591,31 +886,74 @@ export default function Home() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [compact, setCompact] = useState(false)
   const [dark, setDark] = useState(false)
-  const liveData = useHrflowData()
-  const logout = async () => {
-    await fetch('/api/auth/logout', { method: 'POST' }).catch(() => {})
-    await signOut(getFirebaseClientAuth()).catch(() => {})
-    window.location.assign('/login')
+  const [search, setSearch] = useState('')
+  const [action, setAction] = useState(null)
+  const liveData = useHrflowData(active)
+  const profile = liveData.session?.profile
+  const role = profile?.role || 'EMPLOYEE'
+  const canManage = role === 'HR_MANAGER'
+  const canRecruit = role === 'HR_MANAGER' || role === 'RECRUITER'
+  const badges = {
+    employees: liveData.employees.length,
+    recruitment: Object.values(liveData.candidates).flat().length,
+    leave: liveData.raw.leave?.filter((request) => request.status === 'PENDING').length || 0,
   }
-
+  const openAction = (type, title) => setAction({ type, title })
+  const onSaved = async (type, saved) => {
+    if (type === 'invitation' && saved?.token) {
+      await navigator.clipboard.writeText(saved.token).catch(() => {})
+      window.alert('Invitation created. The secure invitation code was copied to your clipboard.')
+    }
+    liveData.refresh()
+  }
   return (
     <div className={`app ${dark ? 'dark' : ''}`}>
-      <Sidebar active={active} setActive={setActive} open={sidebarOpen} setOpen={setSidebarOpen} compact={compact} setCompact={setCompact} />
+      <Sidebar
+        active={active}
+        setActive={setActive}
+        open={sidebarOpen}
+        setOpen={setSidebarOpen}
+        compact={compact}
+        setCompact={setCompact}
+        organizationName={profile?.organization?.name || 'HRFlow organization'}
+        badges={badges}
+      />
       <div className={`mainShell ${compact ? 'shellCompact' : ''}`}>
-        <Header setOpen={setSidebarOpen} dark={dark} setDark={setDark} logout={logout} />
+        <Header
+          setOpen={setSidebarOpen}
+          dark={dark}
+          setDark={setDark}
+          search={search}
+          setSearch={setSearch}
+          setActive={setActive}
+          notifications={liveData.raw.notifications?.filter((item) => item.status !== 'READ').length || 0}
+          profile={profile}
+        />
         <main className={active === 'copilot' ? 'content contentChat' : 'content'}>
-          {active === 'dashboard' && <Dashboard data={liveData.dashboard} />}
-          {active === 'employees' && <EmployeesPage employees={liveData.employees || demoEmployees} />}
+          {active === 'dashboard' && <Dashboard data={liveData.dashboard} employees={liveData.employees} setActive={setActive} openAction={openAction} profile={profile} canManage={canManage} />}
+          {active === 'employees' && <EmployeesPage employees={liveData.employees} initialQuery={search} openAction={openAction} canManage={canManage} leaveRows={liveData.raw.leave} />}
           {active === 'recruitment' && (
             <RecruitmentPage
-              candidates={liveData.candidates || demoCandidates}
-              openJobs={liveData.dashboard?.openJobs ?? 12}
+              candidates={liveData.candidates}
+              openJobs={liveData.dashboard?.openJobs ?? 0}
+              openAction={openAction}
+              canRecruit={canRecruit}
             />
           )}
           {active === 'copilot' && <CopilotPage />}
-          {!['dashboard', 'employees', 'recruitment', 'copilot'].includes(active) && <ModulePage type={active} />}
+          {!['dashboard', 'employees', 'recruitment', 'copilot'].includes(active) && (
+            <ModulePage
+              type={active}
+              rows={liveData.raw[active] || []}
+              openAction={openAction}
+              setActive={setActive}
+              refresh={liveData.refresh}
+              role={role}
+            />
+          )}
         </main>
       </div>
+      <ActionModal action={action} close={() => setAction(null)} onSaved={onSaved} role={role} />
     </div>
   )
 }

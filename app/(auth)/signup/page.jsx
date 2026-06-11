@@ -1,8 +1,8 @@
 'use client'
 
 import Link from 'next/link'
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { Suspense, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import {
   createUserWithEmailAndPassword,
   sendEmailVerification,
@@ -13,8 +13,11 @@ import styles from '../auth.module.css'
 import { ensureFirebasePersistence, getFirebaseClientAuth } from '@/lib/firebase/client'
 import { establishServerSession } from '@/lib/firebase/browser-session'
 
-export default function SignupPage() {
+function SignupForm() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const invitationToken = searchParams.get('invite') || ''
+  const invitedEmail = searchParams.get('email') || ''
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
 
@@ -47,7 +50,7 @@ export default function SignupPage() {
       try {
         const { response, body } = await establishServerSession(credential.user, {
           fullName,
-          organizationName,
+          ...(invitationToken ? { invitationToken } : { organizationName }),
         })
         if (!response.ok && body.code !== 'EMAIL_NOT_VERIFIED') {
           throw new Error(body.error || 'Unable to create your workspace.')
@@ -76,11 +79,15 @@ export default function SignupPage() {
       <form className={styles.form} onSubmit={submit}>
         {error && <p className={styles.error}>{error}</p>}
         <label className={styles.field}>Full name<input name="fullName" autoComplete="name" required /></label>
-        <label className={styles.field}>Organization name<input name="organizationName" autoComplete="organization" required /></label>
-        <label className={styles.field}>Work email<input name="email" type="email" autoComplete="email" required /></label>
+        {!invitationToken && <label className={styles.field}>Organization name<input name="organizationName" autoComplete="organization" required /></label>}
+        <label className={styles.field}>Work email<input name="email" type="email" autoComplete="email" defaultValue={invitedEmail} readOnly={Boolean(invitedEmail)} required /></label>
         <label className={styles.field}>Password<input name="password" type="password" autoComplete="new-password" minLength={8} required /></label>
         <button className={styles.button} disabled={busy}>{busy ? 'Creating workspace...' : 'Create workspace'}</button>
       </form>
     </AuthShell>
   )
+}
+
+export default function SignupPage() {
+  return <Suspense fallback={null}><SignupForm /></Suspense>
 }

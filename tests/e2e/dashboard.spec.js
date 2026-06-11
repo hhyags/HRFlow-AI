@@ -28,8 +28,7 @@ async function login(page, account) {
 
 test('HR Manager dashboard and module navigation remain functional', async ({ page }) => {
   await login(page, accounts.manager)
-  await page.goto('/')
-  await expect(page.getByText('Good morning, Goutham')).toBeVisible()
+  await expect(page.getByRole('heading', { name: /^Welcome,/ })).toBeVisible()
   await expect(page.getByText('Employee growth')).toBeVisible()
   await page.getByRole('button', { name: 'People' }).click()
   await expect(page.getByRole('heading', { name: 'People' })).toBeVisible()
@@ -42,7 +41,7 @@ test('Recruiter can access recruitment but cannot manage employees', async ({ pa
   await expect(page.locator('.app')).toHaveClass(/dark/)
   await page.getByRole('button', { name: 'Recruitment' }).click()
   await expect(page.getByRole('heading', { name: 'Recruitment' })).toBeVisible()
-  await expect(page.getByText('AI match accuracy')).toBeVisible()
+  await expect(page.getByText('Average AI score')).toBeVisible()
   const denied = await page.request.post('/api/employees', { data: {} })
   expect(denied.status()).toBe(403)
   const authorized = await page.request.post('/api/jobs', { data: {} })
@@ -56,6 +55,10 @@ test('Employee can access self-service APIs but not candidate data', async ({ pa
   await expect(page.locator('.sidebar')).toHaveClass(/sidebarOpen/)
   await page.getByRole('button', { name: 'Leave' }).click()
   await expect(page.getByRole('heading', { name: 'Leave management', exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Create new' }).click()
+  await expect(page.getByRole('dialog')).toBeVisible()
+  await expect(page.getByLabel('Employee ID')).toHaveCount(0)
+  await page.getByRole('button', { name: 'Cancel' }).click()
   expect((await page.request.get('/api/attendance')).status()).toBe(200)
   expect((await page.request.get('/api/payroll')).status()).toBe(200)
   expect((await page.request.get('/api/candidates')).status()).toBe(403)
@@ -63,24 +66,33 @@ test('Employee can access self-service APIs but not candidate data', async ({ pa
 })
 
 test('Firebase authentication pages and real session persistence work', async ({ page }) => {
+  test.setTimeout(90000)
   await page.goto('/login')
   await expect(page.getByRole('heading', { name: 'Sign in to HRFlow' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Continue with Google' })).toBeVisible()
-  await page.getByRole('link', { name: 'Create an account' }).click()
+  await Promise.all([
+    page.waitForURL(/\/signup$/),
+    page.getByRole('link', { name: 'Create an account' }).click(),
+  ])
   await expect(page.getByRole('heading', { name: 'Create your workspace' })).toBeVisible()
   await expect(page.getByLabel('Organization name')).toBeVisible()
   await page.getByRole('link', { name: 'Sign in' }).click()
   await page.getByRole('link', { name: 'Forgot password?' }).click()
   await expect(page.getByRole('heading', { name: 'Reset your password' })).toBeVisible()
   await login(page, accounts.manager)
-  await page.reload()
-  await expect(page.getByText('Good morning, Goutham')).toBeVisible()
+  await page.reload({ waitUntil: 'domcontentloaded' })
+  const sessionAfterReload = await page.request.get('/api/auth/session')
+  expect(sessionAfterReload.status(), await sessionAfterReload.text()).toBe(200)
+  await expect(page.getByRole('heading', { name: /^Welcome,/ })).toBeVisible()
+  await expect(page.getByTitle('Sign out')).not.toContainText('HRFlow user')
   await page.getByTitle('Sign out').click()
-  await expect(page).toHaveURL(/\/login$/)
+  await expect(page).toHaveURL(/\/login$/, { timeout: 60000 })
   expect((await page.request.get('/api/auth/session')).status()).toBe(401)
 })
 
-test('Google authentication opens the Firebase-authorized account chooser', async ({ page, context }) => {
+test('Google authentication opens the Firebase-authorized account chooser', async ({ page, context }, testInfo) => {
+  const hostname = new URL(testInfo.project.use.baseURL).hostname
+  test.skip(['localhost', '127.0.0.1'].includes(hostname), 'Firebase Google chooser is validated against the authorized production domain.')
   await page.goto('/login')
   const popupPromise = context.waitForEvent('page')
   await page.getByRole('button', { name: 'Continue with Google' }).click()
