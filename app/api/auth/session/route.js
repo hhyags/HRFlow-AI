@@ -21,6 +21,7 @@ export async function POST(request) {
       organizationName,
       organizationId,
       invitationToken,
+      sessionRefresh = false,
       role = roles.EMPLOYEE,
     } = await request.json()
 
@@ -44,8 +45,28 @@ export async function POST(request) {
 
     const firebaseAuth = getFirebaseAdminAuth()
     const decodedToken = await firebaseAuth.verifyIdToken(idToken, true)
-    if (Date.now() / 1000 - decodedToken.auth_time > 5 * 60) {
+    if (!sessionRefresh && Date.now() / 1000 - decodedToken.auth_time > 5 * 60) {
       return NextResponse.json({ error: 'Recent sign in required' }, { status: 401 })
+    }
+
+    if (sessionRefresh) {
+      const auth = await requireAuth(new Request(request.url, {
+        method: 'GET',
+        headers: { authorization: `Bearer ${idToken}` },
+      }))
+      if (auth.error) return auth.error
+      const sessionCookie = await firebaseAuth.createSessionCookie(idToken, { expiresIn: SESSION_DURATION_MS })
+      return setSessionCookie(NextResponse.json({
+        data: {
+          user: {
+            id: auth.profile.id,
+            email: auth.profile.email,
+            role: auth.profile.role,
+            organizationId: auth.profile.organizationId,
+          },
+          refreshRequired: false,
+        },
+      }), sessionCookie)
     }
 
     const result = await provisionFirebaseUser({

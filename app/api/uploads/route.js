@@ -64,6 +64,12 @@ export async function POST(request) {
       uploadedBy: auth.user.id,
     },
   })
+  if (candidateId && category === 'resume') {
+    await prisma.candidate.update({
+      where: { id: candidateId },
+      data: { resumeUrl: storagePath },
+    })
+  }
   return NextResponse.json({ data: document }, { status: 201 })
 }
 

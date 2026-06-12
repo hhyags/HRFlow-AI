@@ -6,6 +6,9 @@ const mocks = vi.hoisted(() => ({
   shiftCreate: vi.fn(),
   notificationFindMany: vi.fn(),
   notificationCount: vi.fn(),
+  candidateGroupBy: vi.fn(),
+  candidateFindMany: vi.fn(),
+  jobGroupBy: vi.fn(),
 }))
 
 vi.mock('@/lib/auth', () => ({
@@ -15,11 +18,14 @@ vi.mock('@/lib/prisma', () => ({
   getPrisma: () => ({
     shift: { findMany: mocks.shiftFindMany, create: mocks.shiftCreate },
     notification: { findMany: mocks.notificationFindMany, count: mocks.notificationCount },
+    candidate: { groupBy: mocks.candidateGroupBy, findMany: mocks.candidateFindMany },
+    job: { groupBy: mocks.jobGroupBy },
   }),
 }))
 
 const shifts = await import('@/app/api/attendance-engine/shifts/route')
 const notifications = await import('@/app/api/notifications/route')
+const recruitmentAnalytics = await import('@/app/api/recruitment/analytics/route')
 
 function nextRequest(url, options = {}) {
   const request = new Request(url, options)
@@ -79,5 +85,28 @@ describe('production APIs', () => {
     expect(mocks.notificationFindMany).toHaveBeenCalledWith(expect.objectContaining({
       where: expect.objectContaining({ organizationId: 'org', recipientId: 'user', readAt: null }),
     }))
+  })
+
+  it('calculates recruitment pipeline analytics and conversion rates', async () => {
+    mocks.candidateGroupBy.mockResolvedValue([
+      { stage: 'APPLIED', _count: 10, _avg: { aiScore: 80 } },
+      { stage: 'SCREENING', _count: 5, _avg: { aiScore: 85 } },
+      { stage: 'INTERVIEW', _count: 2, _avg: { aiScore: 90 } },
+    ])
+    mocks.jobGroupBy.mockResolvedValue([
+      { status: 'OPEN', _count: 2, _sum: { openings: 3 } },
+    ])
+    mocks.candidateFindMany.mockResolvedValue([
+      { appliedAt: new Date() },
+    ])
+
+    const response = await recruitmentAnalytics.GET(nextRequest('https://hrflow.example/api/recruitment/analytics'))
+    expect(response.status).toBe(200)
+    const body = await response.json()
+    expect(body.data.pipeline.pipelineTotal).toBe(17)
+    expect(body.data.pipeline.conversions.appliedToScreening).toBe(50)
+    expect(body.data.pipeline.conversions.screeningToInterview).toBe(40)
+    expect(body.data.jobs.OPEN).toBe(2)
+    expect(body.data.jobs.totalOpenings).toBe(3)
   })
 })

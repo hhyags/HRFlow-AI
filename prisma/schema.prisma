@@ -193,6 +193,7 @@ model Employee {
   @@unique([organizationId, employeeNumber])
   @@unique([organizationId, email])
   @@index([organizationId, status])
+  @@index([organizationId, joiningDate])
   @@index([departmentId])
   @@map("employees")
 }
@@ -217,6 +218,7 @@ model Job {
   candidates     Candidate[]
 
   @@index([organizationId, status])
+  @@index([organizationId, createdAt])
   @@map("jobs")
 }
 
@@ -242,6 +244,7 @@ model Candidate {
 
   @@unique([organizationId, email, jobId])
   @@index([organizationId, stage])
+  @@index([organizationId, appliedAt])
   @@index([jobId])
   @@map("candidates")
 }
@@ -287,6 +290,7 @@ model LeaveRequest {
   approvals      LeaveApproval[]
 
   @@index([organizationId, status])
+  @@index([organizationId, createdAt])
   @@index([employeeId])
   @@map("leave_requests")
 }
@@ -312,6 +316,7 @@ model Payroll {
 
   @@unique([employeeId, periodStart, periodEnd])
   @@index([organizationId, status])
+  @@index([organizationId, periodEnd])
   @@map("payroll")
 }
 
@@ -334,6 +339,7 @@ model PerformanceReview {
   reviewer       Employee?    @relation("ReviewAuthor", fields: [reviewerId], references: [id], onDelete: SetNull)
 
   @@index([organizationId, period])
+  @@index([organizationId, createdAt])
   @@index([employeeId])
   @@map("performance_reviews")
 }

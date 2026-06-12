@@ -51,7 +51,11 @@ export default function LoginPage() {
     }
     if (cause?.code === 'auth/redirect-cancelled-by-user') return 'Google sign-in was cancelled.'
     if (cause?.code === 'auth/popup-closed-by-user') return 'Google sign-in was cancelled.'
+    if (cause?.code === 'auth/cancelled-popup-request') return 'A Google sign-in request is already open.'
     if (cause?.code === 'auth/network-request-failed') return 'Unable to reach Google sign-in. Check your connection and try again.'
+    if (cause?.code === 'auth/web-storage-unsupported') {
+      return 'Secure browser storage is disabled. Enable cookies and site data, then try again.'
+    }
     if (cause?.code === 'auth/unauthorized-domain') {
       return 'Google sign-in is not enabled for this web address. Use the production HRFlow address or contact an administrator.'
     }
@@ -98,11 +102,12 @@ export default function LoginPage() {
     setError('')
     const auth = getFirebaseClientAuth()
     const provider = new GoogleAuthProvider()
+    provider.setCustomParameters({ prompt: 'select_account' })
     try {
       const credential = await signInWithPopup(auth, provider)
       await finish(credential.user)
     } catch (cause) {
-      if (cause?.code === 'auth/popup-blocked') {
+      if (['auth/popup-blocked', 'auth/operation-not-supported-in-this-environment'].includes(cause?.code)) {
         try {
           await ensureFirebasePersistence()
           await signInWithRedirect(auth, provider)

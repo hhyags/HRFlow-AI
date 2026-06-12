@@ -44,7 +44,7 @@ describe('notification system', () => {
         ]),
         update,
       },
-      user: { findUnique: vi.fn().mockResolvedValue({ fullName: 'User' }) },
+      user: { findMany: vi.fn().mockResolvedValue([{ id: 'u', fullName: 'User' }]) },
     }
     await expect(deliverPendingNotifications({ prisma })).resolves.toEqual({ processed: 2, sent: 2, failed: 0 })
     expect(send).toHaveBeenCalled()
@@ -60,7 +60,7 @@ describe('notification system', () => {
         ]),
         update,
       },
-      user: { findUnique: vi.fn().mockResolvedValue({ fullName: 'User' }) },
+      user: { findMany: vi.fn().mockResolvedValue([{ id: 'u', fullName: 'User' }]) },
     }
     await expect(deliverPendingNotifications({ prisma })).resolves.toEqual({ processed: 1, sent: 0, failed: 1 })
     expect(update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: 'FAILED' }) }))
@@ -75,7 +75,7 @@ describe('notification system', () => {
         ]),
         update,
       },
-      user: { findUnique: vi.fn().mockResolvedValue(null) },
+      user: { findMany: vi.fn().mockResolvedValue([]) },
     }
     await expect(deliverPendingNotifications({ prisma })).resolves.toMatchObject({ failed: 1 })
     prisma.notification.findMany.mockResolvedValue([
@@ -106,8 +106,7 @@ describe('notification system', () => {
       user: {
         findMany: vi.fn().mockResolvedValue([{ id: 'u', employee: { email: 'u@example.com' } }]),
       },
-      notification: { create: vi.fn().mockImplementation(({ data }) => Promise.resolve(data)) },
-      $transaction: (promises) => Promise.all(promises),
+      notification: { createMany: vi.fn().mockResolvedValue({ count: 1 }) },
     }
     await expect(processScheduledReminders({ now: new Date('2026-01-02'), prisma })).resolves.toEqual({ reminders: 1, queued: 1 })
   })
@@ -122,15 +121,14 @@ describe('notification system', () => {
         update: vi.fn().mockResolvedValue({}),
       },
       user: { findMany: vi.fn().mockResolvedValue([{ id: 'u', employee: null }]) },
-      notification: { create: vi.fn().mockImplementation(({ data }) => Promise.resolve(data)) },
-      $transaction: (promises) => Promise.all(promises),
+      notification: { createMany: vi.fn().mockResolvedValue({ count: 1 }) },
     }
     await expect(processScheduledReminders({ now: new Date('2026-01-02'), prisma })).resolves.toEqual({ reminders: 1, queued: 1 })
     expect(prisma.user.findMany).toHaveBeenCalledWith(expect.objectContaining({
       where: { organizationId: 'org' },
     }))
-    expect(prisma.notification.create).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({ title: 'HRFlow reminder', body: 'You have a pending HRFlow action.' }),
+    expect(prisma.notification.createMany).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.arrayContaining([expect.objectContaining({ title: 'HRFlow reminder', body: 'You have a pending HRFlow action.' })]),
     }))
   })
 })

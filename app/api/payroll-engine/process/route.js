@@ -29,6 +29,14 @@ export async function POST(request) {
   if (!input.success || input.data.periodStart > input.data.periodEnd) {
     return NextResponse.json({ error: 'Invalid payroll request', details: input.error?.flatten() }, { status: 400 })
   }
+  const start = input.data.periodStart
+  const end = input.data.periodEnd
+  const isFirstDay = start.getUTCDate() === 1
+  const lastDayExpected = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 1, 0)).getUTCDate()
+  const isLastDay = end.getUTCDate() === lastDayExpected && start.getUTCMonth() === end.getUTCMonth() && start.getUTCFullYear() === end.getUTCFullYear()
+  if (!isFirstDay || !isLastDay) {
+    return NextResponse.json({ error: 'Payroll period must be exactly one calendar month' }, { status: 400 })
+  }
   const prisma = getPrisma()
   const organizationId = auth.profile.organizationId
   const [employees, holidays, attendance, unpaidLeave] = await Promise.all([

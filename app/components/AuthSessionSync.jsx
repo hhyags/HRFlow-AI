@@ -10,11 +10,27 @@ export default function AuthSessionSync() {
     if (!process.env.NEXT_PUBLIC_FIREBASE_API_KEY) return undefined
     const auth = getFirebaseClientAuth()
     let lastSync = 0
-    return onIdTokenChanged(auth, async (user) => {
+    let retryTimer
+    let disposed = false
+
+    async function syncSession(user, retry = true) {
       if (!user || Date.now() - lastSync < 5 * 60_000) return
-      lastSync = Date.now()
-      await establishServerSession(user).catch(() => {})
-    })
+      try {
+        const { response } = await establishServerSession(user, {}, { refresh: true })
+        if (!response.ok) throw new Error('Session refresh failed')
+        lastSync = Date.now()
+      } catch {
+        if (!retry || disposed || !navigator.onLine) return
+        retryTimer = window.setTimeout(() => syncSession(user, false), 2_000)
+      }
+    }
+
+    const unsubscribe = onIdTokenChanged(auth, (user) => syncSession(user))
+    return () => {
+      disposed = true
+      unsubscribe()
+      window.clearTimeout(retryTimer)
+    }
   }, [])
   return null
 }

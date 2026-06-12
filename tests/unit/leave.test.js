@@ -144,34 +144,74 @@ describe('leave approval workflow', () => {
   it('accrues active policies for active employees', async () => {
     const tx = {
       leaveBalance: {
-        upsert: vi.fn().mockResolvedValue({ id: 'balance', openingBalance: 0, accrued: 0, used: 0, adjusted: 0, carriedForward: 0 }),
         update: vi.fn().mockResolvedValue({}),
       },
-      leaveLedgerEntry: { create: vi.fn().mockResolvedValue({}) },
+      leaveLedgerEntry: { createMany: vi.fn().mockResolvedValue({ count: 1 }) },
     }
     const prisma = {
       leavePolicy: { findMany: vi.fn().mockResolvedValue([{ id: 'policy', type: 'CASUAL', accrualPerMonth: 1, maxBalance: 12 }]) },
       employee: { findMany: vi.fn().mockResolvedValue([{ id: 'emp' }]) },
+      leaveBalance: {
+        findMany: vi.fn()
+          .mockResolvedValueOnce([]) // first check: no existing balances
+          .mockResolvedValueOnce([{ id: 'balance', employeeId: 'emp', policyId: 'policy', year: 2026, openingBalance: 0, accrued: 0, used: 0, adjusted: 0, carriedForward: 0 }]), // second check after createMany
+        createMany: vi.fn().mockResolvedValue({ count: 1 }),
+      },
+      leaveLedgerEntry: { findMany: vi.fn().mockResolvedValue([]) },
       $transaction: (callback) => callback(tx),
     }
     await expect(accrueOrganizationLeave({ organizationId: 'org', effectiveDate: new Date('2026-06-01'), prisma })).resolves.toEqual({ processed: 1 })
-    expect(tx.leaveLedgerEntry.create).toHaveBeenCalled()
+    expect(prisma.leaveBalance.createMany).toHaveBeenCalled()
+    expect(tx.leaveLedgerEntry.createMany).toHaveBeenCalled()
   })
 
   it('skips accrual when the balance is capped', async () => {
     const tx = {
       leaveBalance: {
-        upsert: vi.fn().mockResolvedValue({ id: 'balance', openingBalance: 12, accrued: 0, used: 0, adjusted: 0, carriedForward: 0 }),
         update: vi.fn(),
       },
-      leaveLedgerEntry: { create: vi.fn() },
+      leaveLedgerEntry: { createMany: vi.fn() },
     }
     const prisma = {
       leavePolicy: { findMany: vi.fn().mockResolvedValue([{ id: 'policy', type: 'CASUAL', accrualPerMonth: 1, maxBalance: 12 }]) },
       employee: { findMany: vi.fn().mockResolvedValue([{ id: 'emp' }]) },
+      leaveBalance: {
+        findMany: vi.fn().mockResolvedValue([{ id: 'balance', employeeId: 'emp', policyId: 'policy', year: 2026, openingBalance: 12, accrued: 0, used: 0, adjusted: 0, carriedForward: 0 }]),
+        createMany: vi.fn(),
+      },
+      leaveLedgerEntry: { findMany: vi.fn().mockResolvedValue([]) },
       $transaction: (callback) => callback(tx),
     }
-    await expect(accrueOrganizationLeave({ organizationId: 'org', prisma })).resolves.toEqual({ processed: 0 })
+    await expect(accrueOrganizationLeave({ organizationId: 'org', effectiveDate: new Date('2026-06-01'), prisma })).resolves.toEqual({ processed: 0 })
+    expect(tx.leaveBalance.update).not.toHaveBeenCalled()
+  })
+
+  it('does not accrue the same leave type twice in one month', async () => {
+    const tx = {
+      leaveBalance: { update: vi.fn() },
+      leaveLedgerEntry: { createMany: vi.fn() },
+    }
+    const prisma = {
+      leavePolicy: { findMany: vi.fn().mockResolvedValue([{ id: 'policy', type: 'CASUAL', accrualPerMonth: 1, maxBalance: 12 }]) },
+      employee: { findMany: vi.fn().mockResolvedValue([{ id: 'emp' }]) },
+      leaveBalance: {
+        findMany: vi.fn().mockResolvedValue([{ id: 'balance', employeeId: 'emp', policyId: 'policy', year: 2026, openingBalance: 0, accrued: 0, used: 0, adjusted: 0, carriedForward: 0 }]),
+        createMany: vi.fn(),
+      },
+      leaveLedgerEntry: {
+        findMany: vi.fn().mockResolvedValue([{ employeeId: 'emp', type: 'CASUAL' }]),
+      },
+      $transaction: (callback) => callback(tx),
+    }
+
+    await expect(accrueOrganizationLeave({
+      organizationId: 'org',
+      effectiveDate: new Date('2026-06-22'),
+      prisma,
+    })).resolves.toEqual({ processed: 0 })
+    expect(prisma.leaveLedgerEntry.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ effectiveDate: new Date('2026-06-01T00:00:00.000Z') }),
+    }))
     expect(tx.leaveBalance.update).not.toHaveBeenCalled()
   })
 })

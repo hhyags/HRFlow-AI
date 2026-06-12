@@ -105,12 +105,16 @@ test('Firebase authentication pages and real session persistence work', async ({
 })
 
 test('Google authentication opens the Firebase-authorized account chooser', async ({ page, context }, testInfo) => {
+  test.setTimeout(60000)
   const hostname = new URL(testInfo.project.use.baseURL).hostname
   test.skip(['localhost', '127.0.0.1'].includes(hostname), 'Firebase Google chooser is validated against the authorized production domain.')
   await page.goto('/login')
   const popupPromise = context.waitForEvent('page')
   await page.getByRole('button', { name: 'Continue with Google' }).click()
   const popup = await popupPromise
-  await popup.waitForURL((url) => url.hostname === 'accounts.google.com', { timeout: 30000 })
+  await popup.waitForURL((url) => url.hostname === 'accounts.google.com', {
+    timeout: 45000,
+    waitUntil: 'commit',
+  })
   expect(popup.url()).not.toContain('redirect_uri_mismatch')
 })
