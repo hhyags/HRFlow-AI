@@ -29,3 +29,16 @@ deployment can be used, provide a separate Supabase staging project and configur
 - Staging QA accounts for manager, recruiter, and employee roles.
 
 Production database credentials must not be copied into staging.
+
+## Phase 1
+
+- [x] Issue 6: seed preflight rejects missing and placeholder Firebase/database values
+  before any database write.
+
+Issue 6 validation:
+
+- 83 automated tests passed.
+- Production build passed.
+- Missing `FIREBASE_DEMO_UID` manual check passed.
+- Placeholder `FIREBASE_DEMO_UID` manual check passed.
+- Full seed with a valid UID is pending a separate staging Supabase database.

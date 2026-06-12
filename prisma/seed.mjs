@@ -1,9 +1,12 @@
 import { PrismaClient } from '@prisma/client'
+import { printSeedEnvironmentError, validateSeedEnvironment } from './seed-preflight.mjs'
 
 const prisma = new PrismaClient()
 const organizationId = '11111111-1111-4111-8111-111111111111'
 
 async function main() {
+  validateSeedEnvironment()
+
   await prisma.organization.upsert({
     where: { id: organizationId },
     update: {},
@@ -50,10 +53,10 @@ async function main() {
   }
 
   const demoUser = await prisma.user.upsert({
-    where: { firebaseUid: process.env.FIREBASE_DEMO_UID || 'configure-firebase-demo-uid' },
+    where: { firebaseUid: process.env.FIREBASE_DEMO_UID },
     update: {},
     create: {
-      firebaseUid: process.env.FIREBASE_DEMO_UID || 'configure-firebase-demo-uid',
+      firebaseUid: process.env.FIREBASE_DEMO_UID,
       organizationId,
       email: 'elena.rodriguez@acme.test',
       fullName: 'Elena Rodriguez',
@@ -303,4 +306,9 @@ async function main() {
 
 main()
   .then(() => console.log('HRFlow seed data created.'))
+  .catch((error) => {
+    if (error.code === 'SEED_ENV_MISSING') printSeedEnvironmentError(error)
+    else console.error('[SEED ERROR]', error.message)
+    process.exitCode = 1
+  })
   .finally(() => prisma.$disconnect())
