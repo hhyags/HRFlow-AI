@@ -31,7 +31,7 @@ jobs:
       - name: Run real-auth Playwright tests
         run: npm run test:e2e
         env:
-          PLAYWRIGHT_BASE_URL: ${{ secrets.HRFLOW_PRODUCTION_URL }}
+          PLAYWRIGHT_BASE_URL: ${{ secrets.HRFLOW_STAGING_URL }}
           QA_HR_MANAGER_EMAIL: ${{ secrets.QA_HR_MANAGER_EMAIL }}
           QA_HR_MANAGER_PASSWORD: ${{ secrets.QA_HR_MANAGER_PASSWORD }}
           QA_RECRUITER_1_EMAIL: ${{ secrets.QA_RECRUITER_1_EMAIL }}
