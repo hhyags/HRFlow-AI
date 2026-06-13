@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   userUpdate: vi.fn(),
   organizationFindUnique: vi.fn(),
   organizationUpdate: vi.fn(),
+  auditFindMany: vi.fn(),
   transaction: vi.fn((operations) => Promise.all(operations)),
   writeAuditLog: vi.fn(),
 }))
@@ -28,6 +29,7 @@ vi.mock('@/lib/prisma', () => ({
       findUnique: mocks.organizationFindUnique,
       update: mocks.organizationUpdate,
     },
+    auditLog: { findMany: mocks.auditFindMany },
     $transaction: mocks.transaction,
   }),
 }))
@@ -73,6 +75,13 @@ describe('settings API', () => {
     mocks.organizationFindUnique.mockResolvedValue(organization)
     mocks.userUpdate.mockResolvedValue(user)
     mocks.organizationUpdate.mockResolvedValue(organization)
+    mocks.auditFindMany.mockResolvedValue([{
+      id: 'audit-id',
+      action: 'settings.update',
+      resource: 'settings',
+      createdAt: new Date('2026-06-13T08:00:00.000Z'),
+      user: { fullName: 'Demo Manager' },
+    }])
   })
 
   it('returns merged profile, organization, and service settings', async () => {
@@ -85,6 +94,11 @@ describe('settings API', () => {
     expect(body.data.preferences).toMatchObject({
       weeklyDigest: false,
       emailNotifications: true,
+    })
+    expect(body.data.permissions).toHaveLength(3)
+    expect(body.data.audit[0]).toMatchObject({
+      action: 'settings.update',
+      actor: 'Demo Manager',
     })
   })
 

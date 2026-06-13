@@ -54,7 +54,25 @@ const defaultAi = {
   payrollContext: false,
 }
 
-function responseData(user, organization) {
+const permissions = [
+  {
+    role: roles.HR_MANAGER,
+    label: 'HR Manager',
+    summary: 'Full people, payroll, settings, analytics, and approval access.',
+  },
+  {
+    role: roles.RECRUITER,
+    label: 'Recruiter',
+    summary: 'Recruitment workflows and organization employee visibility.',
+  },
+  {
+    role: roles.EMPLOYEE,
+    label: 'Employee',
+    summary: 'Personal attendance, leave, payslip, and profile access.',
+  },
+]
+
+function responseData(user, organization, audit = []) {
   const organizationSettings = organization.settings || {}
   return {
     profile: {
@@ -68,6 +86,14 @@ function responseData(user, organization) {
       workspace: { ...defaultWorkspace, ...(organizationSettings.workspace || {}) },
     },
     ai: { ...defaultAi, ...(organizationSettings.ai || {}) },
+    permissions,
+    audit: audit.map((entry) => ({
+      id: entry.id,
+      action: entry.action,
+      resource: entry.resource,
+      actor: entry.user?.fullName || null,
+      createdAt: entry.createdAt,
+    })),
     services: {
       authentication: 'Firebase',
       databaseSecurity: 'PostgreSQL RLS',
@@ -82,14 +108,23 @@ export async function GET(request) {
   const auth = await requireAuth(request)
   if (auth.error) return auth.error
   const prisma = getPrisma()
-  const [user, organization] = await Promise.all([
+  const [user, organization, audit] = await Promise.all([
     prisma.user.findUnique({ where: { id: auth.user.id } }),
     prisma.organization.findUnique({ where: { id: auth.profile.organizationId } }),
+    prisma.auditLog.findMany({
+      where: {
+        organizationId: auth.profile.organizationId,
+        ...(auth.profile.role === roles.HR_MANAGER ? {} : { userId: auth.user.id }),
+      },
+      include: { user: { select: { fullName: true } } },
+      orderBy: { createdAt: 'desc' },
+      take: 8,
+    }),
   ])
   if (!user || !organization) {
     return NextResponse.json({ error: 'Settings profile was not found.' }, { status: 404 })
   }
-  return NextResponse.json({ data: responseData(user, organization) })
+  return NextResponse.json({ data: responseData(user, organization, audit) })
 }
 
 export async function PUT(request) {
@@ -164,9 +199,15 @@ export async function PUT(request) {
     },
   })
 
-  const [user, organization] = await Promise.all([
+  const [user, organization, audit] = await Promise.all([
     prisma.user.findUnique({ where: { id: auth.user.id } }),
     prisma.organization.findUnique({ where: { id: auth.profile.organizationId } }),
+    prisma.auditLog.findMany({
+      where: { organizationId: auth.profile.organizationId },
+      include: { user: { select: { fullName: true } } },
+      orderBy: { createdAt: 'desc' },
+      take: 8,
+    }),
   ])
-  return NextResponse.json({ data: responseData(user, organization) })
+  return NextResponse.json({ data: responseData(user, organization, audit) })
 }

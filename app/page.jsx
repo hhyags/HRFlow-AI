@@ -14,9 +14,13 @@ import {
   ChevronRight,
   CircleDollarSign,
   Clock3,
+  Download,
   FileText,
   Filter,
+  History,
+  KeyRound,
   LayoutDashboard,
+  LogOut,
   Menu,
   MessageSquareText,
   Moon,
@@ -25,6 +29,7 @@ import {
   Plus,
   Search,
   Settings,
+  ShieldCheck,
   Sparkles,
   Sun,
   Target,
@@ -885,6 +890,40 @@ function SettingsPage({ role, refresh, openAction }) {
     }
   }
 
+  function exportSettings() {
+    const exportData = {
+      exportedAt: new Date().toISOString(),
+      profile: settings.profile,
+      preferences: settings.preferences,
+      organization: settings.organization,
+      ai: settings.ai,
+      services: settings.services,
+    }
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `hrflow-settings-${new Date().toISOString().slice(0, 10)}.json`
+    link.click()
+    URL.revokeObjectURL(url)
+    setMessage('Settings export downloaded.')
+  }
+
+  async function revokeSessions() {
+    if (!window.confirm('Sign out this account from all devices?')) return
+    setBusy(true)
+    setMessage('')
+    try {
+      const response = await fetch('/api/settings/security', { method: 'POST' })
+      const body = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(body.error || 'Unable to revoke sessions.')
+      window.location.assign('/login')
+    } catch (error) {
+      setMessage(error.message)
+      setBusy(false)
+    }
+  }
+
   if (!settings) {
     return <>
       <PageHeading title="Settings" description="Manage organization access, security, and integrations." />
@@ -895,6 +934,7 @@ function SettingsPage({ role, refresh, openAction }) {
   return <>
     <PageHeading title="Settings" description="Manage organization access, security, and integrations.">
       {canManageOrganization && <button className="button secondary" onClick={() => openAction('invitation', 'Invite team member')}><UserPlus size={16} /> Invite member</button>}
+      <button className="button secondary" type="button" onClick={exportSettings}><Download size={16} /> Export settings</button>
       <button className="button primary" type="submit" form="settings-form" disabled={busy}>{busy ? 'Saving...' : 'Save changes'}</button>
     </PageHeading>
     {message && <div className="card actionResult" role="status"><Activity size={17} /><p>{message}</p><button className="iconButton" onClick={() => setMessage('')} aria-label="Dismiss message"><X size={15} /></button></div>}
@@ -949,6 +989,35 @@ function SettingsPage({ role, refresh, openAction }) {
           <div><span>Email delivery</span><strong className={settings.services.emailConfigured ? 'serviceReady' : 'servicePending'}>{settings.services.emailConfigured ? 'Configured' : 'Needs setup'}</strong></div>
           <div><span>Error monitoring</span><strong className={settings.services.monitoringConfigured ? 'serviceReady' : 'servicePending'}>{settings.services.monitoringConfigured ? 'Configured' : 'Needs setup'}</strong></div>
           <div><span>Organization isolation</span><strong className="serviceReady">Active</strong></div>
+        </div>
+      </section>
+
+      <section className="card settingsSection">
+        <div className="settingsTitle"><ShieldCheck size={18} /><div><h2>Roles & permissions</h2><p>Access levels enforced by API RBAC and organization isolation.</p></div></div>
+        <div className="permissionRows">
+          {settings.permissions.map((permission) => <div key={permission.role}>
+            <span><b>{permission.label}</b><small>{permission.summary}</small></span>
+            <strong className={permission.role === role ? 'currentRole' : ''}>{permission.role === role ? 'Your role' : 'Defined'}</strong>
+          </div>)}
+        </div>
+      </section>
+
+      <section className="card settingsSection">
+        <div className="settingsTitle"><KeyRound size={18} /><div><h2>Account security</h2><p>Manage password recovery and active Firebase sessions.</p></div></div>
+        <div className="securityActions">
+          <button className="button secondary" type="button" onClick={() => window.location.assign('/forgot-password')}><KeyRound size={15} /> Reset password</button>
+          <button className="button secondary dangerButton" type="button" disabled={busy} onClick={revokeSessions}><LogOut size={15} /> Sign out all devices</button>
+        </div>
+        <p className="settingsHint">Session cookies are secure, HTTP-only, and checked for revocation on protected requests.</p>
+      </section>
+
+      <section className="card settingsSection settingsWide">
+        <div className="settingsTitle"><History size={18} /><div><h2>Recent security activity</h2><p>Latest account and settings events visible to your role.</p></div></div>
+        <div className="auditRows">
+          {settings.audit.length ? settings.audit.map((entry) => <div key={entry.id}>
+            <span><b>{entry.action.replaceAll('.', ' ')}</b><small>{entry.actor || 'System'} · {entry.resource}</small></span>
+            <time dateTime={entry.createdAt}>{new Date(entry.createdAt).toLocaleString()}</time>
+          </div>) : <p className="settingsHint">No recent settings or security events.</p>}
         </div>
       </section>
     </form>

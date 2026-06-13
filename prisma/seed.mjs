@@ -473,6 +473,38 @@ async function main() {
       data: { organizationId, type: 'WEEKLY_DIGEST', ...reminderData },
     })
   }
+
+  await prisma.auditLog.deleteMany({
+    where: {
+      organizationId,
+      resource: 'demo_settings',
+    },
+  })
+  await prisma.auditLog.createMany({
+    data: [
+      {
+        organizationId,
+        userId: demoUser.id,
+        action: 'settings.update',
+        resource: 'demo_settings',
+        metadata: { section: 'organization', demo: true },
+      },
+      {
+        organizationId,
+        userId: demoUser.id,
+        action: 'security.review',
+        resource: 'demo_settings',
+        metadata: { result: 'passed', demo: true },
+      },
+      {
+        organizationId,
+        userId: demoUser.id,
+        action: 'ai.configuration.update',
+        resource: 'demo_settings',
+        metadata: { model: 'gemini-2.5-flash', demo: true },
+      },
+    ],
+  })
 }
 
 main()

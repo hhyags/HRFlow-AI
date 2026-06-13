@@ -262,6 +262,18 @@ kbd { padding: 3px 6px; border: 1px solid var(--border); border-radius: 5px; col
 .serviceRows > div { min-height: 45px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 9px; }
 .serviceRows > div:last-child { border-bottom: 0; }
 .serviceReady { color: var(--green); }.servicePending { color: var(--amber); }
+.permissionRows, .auditRows { display: grid; gap: 3px; }
+.permissionRows > div, .auditRows > div { min-height: 50px; padding: 7px 0; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.permissionRows > div:last-child, .auditRows > div:last-child { border-bottom: 0; }
+.permissionRows span, .auditRows span { display: grid; gap: 4px; }
+.permissionRows b, .auditRows b { font-size: 9px; text-transform: capitalize; }
+.permissionRows small, .auditRows small, .auditRows time { color: var(--muted); font-size: 8px; }
+.permissionRows strong { padding: 4px 7px; border-radius: 20px; color: var(--muted); background: var(--surface-2); font-size: 7px; }
+.permissionRows .currentRole { color: var(--primary); background: var(--primary-soft); }
+.securityActions { display: flex; flex-wrap: wrap; gap: 8px; }
+.dangerButton { color: var(--red) !important; }
+.settingsWide { grid-column: 1 / -1; }
+.auditRows time { white-space: nowrap; }
 .miniBars { height: 45px; display: flex; align-items: flex-end; gap: 7px; }.miniBars i { flex: 1; height: 35%; border-radius: 3px 3px 0 0; background: color-mix(in srgb, var(--primary) 65%, transparent); }.miniBars i:nth-child(2) { height: 58%; }.miniBars i:nth-child(3) { height: 44%; }.miniBars i:nth-child(4) { height: 78%; }.miniBars i:nth-child(5) { height: 62%; }.miniBars i:nth-child(6) { height: 92%; }
 .mini1 i { background: color-mix(in srgb, var(--amber) 65%, transparent); }.mini2 i { background: color-mix(in srgb, var(--green) 65%, transparent); }
 .emptyModule { margin-top: 14px; padding: 34px; display: flex; flex-direction: column; align-items: center; text-align: center; }.emptyModule h2 { margin: 13px 0 5px; font-size: 14px; }.emptyModule p { margin: 0 0 15px; color: var(--muted); font-size: 9px; }
@@ -310,6 +322,8 @@ kbd { padding: 3px 6px; border: 1px solid var(--border); border-radius: 5px; col
 @media (max-width: 560px) {
   .settingsFields { grid-template-columns: 1fr; }
   .settingsToggles > label { align-items: flex-start; }
+  .settingsWide { grid-column: auto; }
+  .auditRows > div { align-items: flex-start; flex-direction: column; }
 }
 
 @media (max-width: 560px) {
