@@ -62,6 +62,9 @@ export default function LoginPage() {
     if (cause?.code === 'auth/internal-error') {
       return 'Your browser blocked secure sign-in storage. Refresh the page or try a private window.'
     }
+    if (cause?.code === 'auth/invalid-api-key') {
+      return 'Sign-in is not configured for this environment. Contact the HRFlow administrator.'
+    }
     return cause?.message || 'Unable to sign in.'
   }
 
