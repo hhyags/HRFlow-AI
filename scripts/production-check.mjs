@@ -1,20 +1,25 @@
 import { spawnSync } from 'node:child_process'
 
-const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm'
+const npmCli = process.env.npm_execpath
+if (!npmCli) {
+  console.error('Unable to locate the npm CLI from the current environment.')
+  process.exit(1)
+}
+
 const commands = [
-  [npm, ['run', 'env:validate']],
-  [npm, ['run', 'prisma:generate']],
-  [npm, ['run', 'prisma:validate']],
-  [npm, ['run', 'db:status']],
-  [npm, ['run', 'db:validate']],
-  [npm, ['run', 'auth:reconcile']],
-  [npm, ['run', 'test:coverage']],
-  [npm, ['run', 'build']],
-  [npm, ['audit', '--omit=dev']],
+  ['run', 'env:validate'],
+  ['run', 'prisma:generate'],
+  ['run', 'prisma:validate'],
+  ['run', 'db:status'],
+  ['run', 'db:validate'],
+  ['run', 'auth:reconcile'],
+  ['run', 'test:coverage'],
+  ['run', 'build'],
+  ['audit', '--omit=dev'],
 ]
 
-for (const [command, args] of commands) {
-  const result = spawnSync(command, args, { stdio: 'inherit', shell: process.platform === 'win32' })
+for (const args of commands) {
+  const result = spawnSync(process.execPath, [npmCli, ...args], { stdio: 'inherit' })
   if (result.status !== 0) process.exit(result.status || 1)
 }
 console.log('HRFlow AI production checks passed.')

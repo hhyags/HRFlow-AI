@@ -38,6 +38,19 @@ const firebaseByUid = new Map(firebaseUsers.map((user) => [user.uid, user]))
 const databaseByUid = new Map(databaseUsers.map((user) => [user.firebaseUid, user]))
 const missingFirebase = databaseUsers.filter((user) => !firebaseByUid.has(user.firebaseUid))
 const missingDatabase = firebaseUsers.filter((user) => !databaseByUid.has(user.uid))
+const missingDatabaseByEmail = new Map(
+  missingDatabase
+    .filter((user) => user.email)
+    .map((user) => [user.email.toLowerCase(), user]),
+)
+const relinkable = missingFirebase.flatMap((user) => {
+  const identity = missingDatabaseByEmail.get(user.email.toLowerCase())
+  return identity ? [{ user, identity }] : []
+})
+const relinkedDatabaseIds = new Set(relinkable.map(({ user }) => user.id))
+const relinkedFirebaseUids = new Set(relinkable.map(({ identity }) => identity.uid))
+const unresolvedMissingFirebase = missingFirebase.filter((user) => !relinkedDatabaseIds.has(user.id))
+const unresolvedMissingDatabase = missingDatabase.filter((user) => !relinkedFirebaseUids.has(user.uid))
 const mismatches = databaseUsers.flatMap((user) => {
   const identity = firebaseByUid.get(user.firebaseUid)
   if (!identity) return []
@@ -52,7 +65,18 @@ const mismatches = databaseUsers.flatMap((user) => {
 })
 
 if (fix) {
-  for (const user of missingFirebase) {
+  for (const { user, identity } of relinkable) {
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { firebaseUid: identity.uid },
+    })
+    await firebase.setCustomUserClaims(identity.uid, {
+      role: 'authenticated',
+      app_role: user.role,
+      organization_id: user.organizationId,
+    })
+  }
+  for (const user of unresolvedMissingFirebase) {
     const identity = await firebase.createUser({
       uid: user.firebaseUid,
       email: user.email,
@@ -77,18 +101,28 @@ if (fix) {
   }
 }
 
+const hasRemainingDrift = fix
+  ? unresolvedMissingDatabase.length > 0
+  : missingFirebase.length > 0 || missingDatabase.length > 0 || mismatches.length > 0
+
 console.log(JSON.stringify({
-  status: missingFirebase.length || missingDatabase.length || mismatches.length ? 'drift-detected' : 'ok',
+  status: hasRemainingDrift ? 'drift-detected' : 'ok',
   fixApplied: fix,
   counts: {
     databaseUsers: databaseUsers.length,
     firebaseUsers: firebaseUsers.length,
-    missingFirebase: missingFirebase.length,
-    missingDatabase: missingDatabase.length,
+    relinkable: relinkable.length,
+    missingFirebase: unresolvedMissingFirebase.length,
+    missingDatabase: unresolvedMissingDatabase.length,
     mismatches: mismatches.length,
   },
-  missingFirebase: missingFirebase.map((user) => ({ id: user.id, email: user.email })),
-  missingDatabase: missingDatabase.map((user) => ({ uid: user.uid, email: user.email })),
+  relinkable: relinkable.map(({ user, identity }) => ({
+    id: user.id,
+    email: user.email,
+    firebaseUid: identity.uid,
+  })),
+  missingFirebase: unresolvedMissingFirebase.map((user) => ({ id: user.id, email: user.email })),
+  missingDatabase: unresolvedMissingDatabase.map((user) => ({ uid: user.uid, email: user.email })),
   mismatches: mismatches.map(({ user, emailMismatch, claimsMismatch }) => ({
     id: user.id,
     email: user.email,
@@ -98,4 +132,4 @@ console.log(JSON.stringify({
 }, null, 2))
 
 await prisma.$disconnect()
-if ((!fix && (missingFirebase.length || mismatches.length)) || missingDatabase.length) process.exitCode = 1
+if (hasRemainingDrift) process.exitCode = 1

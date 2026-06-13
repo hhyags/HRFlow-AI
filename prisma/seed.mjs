@@ -1,5 +1,8 @@
 import { PrismaClient } from '@prisma/client'
+import nextEnv from '@next/env'
 import { printSeedEnvironmentError, validateSeedEnvironment } from './seed-preflight.mjs'
+
+nextEnv.loadEnvConfig(process.cwd())
 
 const prisma = new PrismaClient()
 const organizationId = '11111111-1111-4111-8111-111111111111'
@@ -65,30 +68,37 @@ async function main() {
     }))
   }
 
-  const demoUser = await prisma.user.upsert({
-    where: { firebaseUid: process.env.FIREBASE_DEMO_UID },
-    update: {
-      preferences: {
-        emailNotifications: true,
-        inAppNotifications: true,
-        weeklyDigest: true,
-        theme: 'SYSTEM',
-      },
-    },
-    create: {
-      firebaseUid: process.env.FIREBASE_DEMO_UID,
-      organizationId,
-      email: 'elena.rodriguez@acme.test',
-      fullName: 'Elena Rodriguez',
-      role: 'HR_MANAGER',
-      preferences: {
-        emailNotifications: true,
-        inAppNotifications: true,
-        weeklyDigest: true,
-        theme: 'SYSTEM',
-      },
+  const existingDemoUser = await prisma.user.findFirst({
+    where: {
+      OR: [
+        { firebaseUid: process.env.FIREBASE_DEMO_UID },
+        { organizationId, email: 'elena.rodriguez@acme.test' },
+      ],
     },
   })
+  const demoUserData = {
+    organizationId,
+    email: 'elena.rodriguez@acme.test',
+    fullName: 'Elena Rodriguez',
+    role: 'HR_MANAGER',
+    preferences: {
+      emailNotifications: true,
+      inAppNotifications: true,
+      weeklyDigest: true,
+      theme: 'SYSTEM',
+    },
+  }
+  const demoUser = existingDemoUser
+    ? await prisma.user.update({
+      where: { id: existingDemoUser.id },
+      data: demoUserData,
+    })
+    : await prisma.user.create({
+      data: {
+        ...demoUserData,
+        firebaseUid: process.env.FIREBASE_DEMO_UID,
+      },
+    })
   await prisma.employee.update({
     where: { id: employees[2].id },
     data: { profileId: demoUser.id },
@@ -97,34 +107,38 @@ async function main() {
   const recruiterIndexes = [0, 3, 5, 6, 8]
   for (let index = 0; index < recruiterIndexes.length; index += 1) {
     const employee = employees[recruiterIndexes[index]]
-    const recruiter = await prisma.user.upsert({
-      where: { firebaseUid: `seed:recruiter:${index + 1}` },
-      update: {
-        organizationId,
-        email: employee.email,
-        fullName: `${employee.firstName} ${employee.lastName}`,
-        role: 'RECRUITER',
-        preferences: {
-          emailNotifications: true,
-          inAppNotifications: true,
-          weeklyDigest: false,
-          theme: 'SYSTEM',
-        },
-      },
-      create: {
-        firebaseUid: `seed:recruiter:${index + 1}`,
-        organizationId,
-        email: employee.email,
-        fullName: `${employee.firstName} ${employee.lastName}`,
-        role: 'RECRUITER',
-        preferences: {
-          emailNotifications: true,
-          inAppNotifications: true,
-          weeklyDigest: false,
-          theme: 'SYSTEM',
-        },
+    const firebaseUid = `seed:recruiter:${index + 1}`
+    const existingRecruiter = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { firebaseUid },
+          { organizationId, email: employee.email },
+        ],
       },
     })
+    const recruiterData = {
+      organizationId,
+      email: employee.email,
+      fullName: `${employee.firstName} ${employee.lastName}`,
+      role: 'RECRUITER',
+      preferences: {
+        emailNotifications: true,
+        inAppNotifications: true,
+        weeklyDigest: false,
+        theme: 'SYSTEM',
+      },
+    }
+    const recruiter = existingRecruiter
+      ? await prisma.user.update({
+        where: { id: existingRecruiter.id },
+        data: recruiterData,
+      })
+      : await prisma.user.create({
+        data: {
+          ...recruiterData,
+          firebaseUid,
+        },
+      })
     await prisma.employee.update({
       where: { id: employee.id },
       data: { profileId: recruiter.id },
@@ -229,7 +243,7 @@ async function main() {
       where: { employeeId_periodStart_periodEnd: { employeeId: employee.id, periodStart, periodEnd } },
       update: {
         baseSalary,
-        bonuses: 500,
+        bonus: 500,
         deductions: 175,
         netPay: baseSalary + 325,
         status: 'PAID',
@@ -237,7 +251,7 @@ async function main() {
       },
       create: {
         organizationId, employeeId: employee.id, periodStart, periodEnd,
-        baseSalary, bonuses: 500, deductions: 175, netPay: baseSalary + 325,
+        baseSalary, bonus: 500, deductions: 175, netPay: baseSalary + 325,
         status: 'PAID', paidAt: new Date(),
       },
     })

@@ -28,7 +28,7 @@ async function main() {
     attendance,
     leaveRequests,
     payroll,
-    orphanEmployees,
+    crossTenantEmployeeDepartments,
     policies,
   ] = await Promise.all([
     prisma.employee.count({ where: { organizationId } }),
@@ -42,10 +42,8 @@ async function main() {
     prisma.employee.count({
       where: {
         organizationId,
-        OR: [
-          { departmentId: null },
-          { department: { organizationId: { not: organizationId } } },
-        ],
+        departmentId: { not: null },
+        department: { organizationId: { not: organizationId } },
       },
     }),
     prisma.$queryRaw`
@@ -85,7 +83,9 @@ async function main() {
   for (const table of requiredPolicyTables) {
     if (!policyTables.has(table)) failures.push(`RLS policy missing for ${table}`)
   }
-  if (orphanEmployees) failures.push(`${orphanEmployees} employees have invalid department relationships`)
+  if (crossTenantEmployeeDepartments) {
+    failures.push(`${crossTenantEmployeeDepartments} employees have cross-organization department relationships`)
+  }
 
   if (failures.length) {
     console.error(`Production data validation failed:\n${failures.map((failure) => `- ${failure}`).join('\n')}`)
@@ -98,7 +98,7 @@ async function main() {
     organizationId,
     counts,
     rlsPolicyCount: policies.length,
-    integrity: { orphanEmployees },
+    integrity: { crossTenantEmployeeDepartments },
   }, null, 2))
 }
 
