@@ -42,3 +42,11 @@ Issue 6 validation:
 - Missing `FIREBASE_DEMO_UID` manual check passed.
 - Placeholder `FIREBASE_DEMO_UID` manual check passed.
 - Full seed with a valid UID is pending a separate staging Supabase database.
+
+## Additional Testing Improvements
+
+- Added persistent profile, organization, notification, theme, and AI settings.
+- Added role enforcement so only HR managers can change organization and AI controls.
+- Added demo performance reviews, payroll bonuses and deductions, holidays,
+  notifications, and a weekly reminder to the idempotent seed.
+- Settings API tests cover read, update, and unauthorized organization changes.

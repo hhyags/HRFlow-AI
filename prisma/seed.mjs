@@ -9,8 +9,21 @@ async function main() {
 
   await prisma.organization.upsert({
     where: { id: organizationId },
-    update: {},
-    create: { id: organizationId, name: 'Acme Corporation', slug: 'acme-corporation' },
+    update: {
+      settings: {
+        workspace: { timezone: 'America/New_York', locale: 'en-US', currency: 'USD' },
+        ai: { enabled: true, cacheEnabled: true, payrollContext: false },
+      },
+    },
+    create: {
+      id: organizationId,
+      name: 'Acme Corporation',
+      slug: 'acme-corporation',
+      settings: {
+        workspace: { timezone: 'America/New_York', locale: 'en-US', currency: 'USD' },
+        ai: { enabled: true, cacheEnabled: true, payrollContext: false },
+      },
+    },
   })
 
   const departments = {}
@@ -54,13 +67,26 @@ async function main() {
 
   const demoUser = await prisma.user.upsert({
     where: { firebaseUid: process.env.FIREBASE_DEMO_UID },
-    update: {},
+    update: {
+      preferences: {
+        emailNotifications: true,
+        inAppNotifications: true,
+        weeklyDigest: true,
+        theme: 'SYSTEM',
+      },
+    },
     create: {
       firebaseUid: process.env.FIREBASE_DEMO_UID,
       organizationId,
       email: 'elena.rodriguez@acme.test',
       fullName: 'Elena Rodriguez',
       role: 'HR_MANAGER',
+      preferences: {
+        emailNotifications: true,
+        inAppNotifications: true,
+        weeklyDigest: true,
+        theme: 'SYSTEM',
+      },
     },
   })
   await prisma.employee.update({
@@ -78,6 +104,12 @@ async function main() {
         email: employee.email,
         fullName: `${employee.firstName} ${employee.lastName}`,
         role: 'RECRUITER',
+        preferences: {
+          emailNotifications: true,
+          inAppNotifications: true,
+          weeklyDigest: false,
+          theme: 'SYSTEM',
+        },
       },
       create: {
         firebaseUid: `seed:recruiter:${index + 1}`,
@@ -85,6 +117,12 @@ async function main() {
         email: employee.email,
         fullName: `${employee.firstName} ${employee.lastName}`,
         role: 'RECRUITER',
+        preferences: {
+          emailNotifications: true,
+          inAppNotifications: true,
+          weeklyDigest: false,
+          theme: 'SYSTEM',
+        },
       },
     })
     await prisma.employee.update({
@@ -184,15 +222,50 @@ async function main() {
 
   const periodStart = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1))
   const periodEnd = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + 1, 0))
+  const payrollRecords = []
   for (const employee of employees) {
     const baseSalary = Number(employee.salary || 0) / 12
-    await prisma.payroll.upsert({
+    const payroll = await prisma.payroll.upsert({
       where: { employeeId_periodStart_periodEnd: { employeeId: employee.id, periodStart, periodEnd } },
-      update: { baseSalary, netPay: baseSalary, status: 'PAID', paidAt: new Date() },
+      update: {
+        baseSalary,
+        bonuses: 500,
+        deductions: 175,
+        netPay: baseSalary + 325,
+        status: 'PAID',
+        paidAt: new Date(),
+      },
       create: {
         organizationId, employeeId: employee.id, periodStart, periodEnd,
-        baseSalary, netPay: baseSalary, status: 'PAID', paidAt: new Date(),
+        baseSalary, bonuses: 500, deductions: 175, netPay: baseSalary + 325,
+        status: 'PAID', paidAt: new Date(),
       },
+    })
+    payrollRecords.push(payroll)
+    await prisma.payrollItem.deleteMany({ where: { payrollId: payroll.id } })
+    await prisma.payrollItem.createMany({
+      data: [
+        {
+          organizationId,
+          payrollId: payroll.id,
+          employeeId: employee.id,
+          type: 'EARNING',
+          code: 'PERFORMANCE_BONUS',
+          description: 'Monthly performance bonus',
+          amount: 500,
+          taxable: true,
+        },
+        {
+          organizationId,
+          payrollId: payroll.id,
+          employeeId: employee.id,
+          type: 'DEDUCTION',
+          code: 'BENEFITS',
+          description: 'Benefits contribution',
+          amount: 175,
+          taxable: false,
+        },
+      ],
     })
   }
 
@@ -301,6 +374,104 @@ async function main() {
         },
       })
     }
+  }
+
+  const holidayRows = [
+    ['Company Foundation Day', 15, 7, false],
+    ['Year-end Holiday', 24, 11, false],
+    ['Community Service Day', 18, 8, true],
+  ]
+  for (const [name, day, month, isOptional] of holidayRows) {
+    const date = new Date(Date.UTC(today.getUTCFullYear(), month, day))
+    await prisma.holiday.upsert({
+      where: { organizationId_date_name: { organizationId, date, name } },
+      update: { isOptional, location: 'All offices' },
+      create: { organizationId, name, date, isOptional, location: 'All offices' },
+    })
+  }
+
+  for (let index = 0; index < Math.min(employees.length, 6); index += 1) {
+    const period = `${today.getUTCFullYear()} H1`
+    const existingReview = await prisma.performanceReview.findFirst({
+      where: { organizationId, employeeId: employees[index].id, period },
+    })
+    const reviewData = {
+      reviewerId: employees[2].id,
+      rating: 3.8 + (index % 3) * 0.35,
+      goalsScore: 78 + index * 3,
+      feedback: 'Strong contribution with consistent collaboration and measurable progress.',
+      strengths: ['Collaboration', 'Ownership', 'Communication'],
+      improvements: ['Delegation', 'Long-term planning'],
+      submittedAt: new Date(),
+    }
+    if (existingReview) {
+      await prisma.performanceReview.update({ where: { id: existingReview.id }, data: reviewData })
+    } else {
+      await prisma.performanceReview.create({
+        data: {
+          organizationId,
+          employeeId: employees[index].id,
+          period,
+          ...reviewData,
+        },
+      })
+    }
+  }
+
+  const demoNotifications = [
+    ['WELCOME', 'Welcome to HRFlow AI', 'Your demo workspace is ready for testing.', 'READ'],
+    ['LEAVE_APPROVAL', 'Leave request needs review', 'A pending earned leave request is waiting for approval.', 'SENT'],
+    ['PAYROLL_COMPLETE', 'Payroll completed', `${payrollRecords.length} demo payslips are ready to review.`, 'SENT'],
+    ['RECRUITMENT', 'Candidate pipeline updated', 'New candidates are available for AI ranking.', 'SENT'],
+  ]
+  for (const [type, title, body, status] of demoNotifications) {
+    const existing = await prisma.notification.findFirst({
+      where: { organizationId, recipientId: demoUser.id, type, title },
+    })
+    const notificationData = {
+      channel: 'IN_APP',
+      body,
+      status,
+      sentAt: new Date(),
+      readAt: status === 'READ' ? new Date() : null,
+      data: { demo: true },
+    }
+    if (existing) {
+      await prisma.notification.update({ where: { id: existing.id }, data: notificationData })
+    } else {
+      await prisma.notification.create({
+        data: {
+          organizationId,
+          recipientId: demoUser.id,
+          type,
+          title,
+          ...notificationData,
+        },
+      })
+    }
+  }
+
+  const reminder = await prisma.scheduledReminder.findFirst({
+    where: { organizationId, type: 'WEEKLY_DIGEST' },
+  })
+  const reminderData = {
+    schedule: '0 8 * * 1',
+    nextRunAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+    payload: {
+      title: 'Weekly HR digest',
+      body: 'Review attendance, leave, payroll, and recruitment highlights.',
+      roles: ['HR_MANAGER'],
+      email: false,
+      demo: true,
+    },
+    isActive: true,
+  }
+  if (reminder) {
+    await prisma.scheduledReminder.update({ where: { id: reminder.id }, data: reminderData })
+  } else {
+    await prisma.scheduledReminder.create({
+      data: { organizationId, type: 'WEEKLY_DIGEST', ...reminderData },
+    })
   }
 }
 

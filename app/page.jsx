@@ -818,7 +818,144 @@ function CopilotPage() {
   )
 }
 
-function ModulePage({ type, rows = [], openAction, setActive, refresh, role }) {
+function SettingsPage({ role, refresh, openAction }) {
+  const [settings, setSettings] = useState(null)
+  const [message, setMessage] = useState('')
+  const [busy, setBusy] = useState(false)
+  const canManageOrganization = role === 'HR_MANAGER'
+
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/settings', { credentials: 'include' })
+      .then(async (response) => {
+        const body = await response.json()
+        if (!response.ok) throw new Error(body.error || 'Unable to load settings.')
+        if (!cancelled) setSettings(body.data)
+      })
+      .catch((error) => {
+        if (!cancelled) setMessage(error.message)
+      })
+    return () => { cancelled = true }
+  }, [])
+
+  function update(section, key, value) {
+    setSettings((current) => ({
+      ...current,
+      [section]: { ...current[section], [key]: value },
+    }))
+  }
+
+  function updateWorkspace(key, value) {
+    setSettings((current) => ({
+      ...current,
+      organization: {
+        ...current.organization,
+        workspace: { ...current.organization.workspace, [key]: value },
+      },
+    }))
+  }
+
+  async function save(event) {
+    event.preventDefault()
+    setBusy(true)
+    setMessage('')
+    try {
+      const payload = {
+        profile: { fullName: settings.profile.fullName },
+        preferences: settings.preferences,
+        ...(canManageOrganization ? {
+          organization: settings.organization,
+          ai: settings.ai,
+        } : {}),
+      }
+      const response = await fetch('/api/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      const body = await response.json()
+      if (!response.ok) throw new Error(body.error || 'Unable to save settings.')
+      setSettings(body.data)
+      setMessage('Settings saved successfully.')
+      refresh()
+    } catch (error) {
+      setMessage(error.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (!settings) {
+    return <>
+      <PageHeading title="Settings" description="Manage organization access, security, and integrations." />
+      <div className="card emptyState"><Settings size={24} /><h2>Loading settings</h2><p>{message || 'Retrieving your workspace configuration.'}</p></div>
+    </>
+  }
+
+  return <>
+    <PageHeading title="Settings" description="Manage organization access, security, and integrations.">
+      {canManageOrganization && <button className="button secondary" onClick={() => openAction('invitation', 'Invite team member')}><UserPlus size={16} /> Invite member</button>}
+      <button className="button primary" type="submit" form="settings-form" disabled={busy}>{busy ? 'Saving...' : 'Save changes'}</button>
+    </PageHeading>
+    {message && <div className="card actionResult" role="status"><Activity size={17} /><p>{message}</p><button className="iconButton" onClick={() => setMessage('')} aria-label="Dismiss message"><X size={15} /></button></div>}
+    <div className="moduleGrid">
+      <div className="card moduleCard"><span>Authentication</span><strong>{settings.services.authentication}</strong><p>Email/password and Google authentication</p></div>
+      <div className="card moduleCard"><span>Tenant security</span><strong>RLS</strong><p>{settings.services.databaseSecurity} organization isolation</p></div>
+      <div className="card moduleCard"><span>AI service</span><strong>Gemini</strong><p>{settings.services.aiModel}, cached and audited</p></div>
+    </div>
+    <form id="settings-form" className="settingsLayout" onSubmit={save}>
+      <section className="card settingsSection">
+        <div className="settingsTitle"><Users size={18} /><div><h2>Profile</h2><p>Your personal workspace identity.</p></div></div>
+        <div className="settingsFields">
+          <label>Full name<input value={settings.profile.fullName} onChange={(event) => update('profile', 'fullName', event.target.value)} required minLength={2} /></label>
+          <label>Work email<input value={settings.profile.email} disabled /></label>
+          <label>Role<input value={settings.profile.role.replace('_', ' ')} disabled /></label>
+        </div>
+      </section>
+
+      <section className="card settingsSection">
+        <div className="settingsTitle"><Building2 size={18} /><div><h2>Organization</h2><p>Regional defaults used by HR and payroll.</p></div></div>
+        <div className="settingsFields">
+          <label>Organization name<input value={settings.organization.name} disabled={!canManageOrganization} onChange={(event) => update('organization', 'name', event.target.value)} required /></label>
+          <label>Timezone<select value={settings.organization.workspace.timezone} disabled={!canManageOrganization} onChange={(event) => updateWorkspace('timezone', event.target.value)}><option value="UTC">UTC</option><option value="Asia/Kolkata">Asia/Kolkata</option><option value="America/New_York">America/New York</option><option value="Europe/London">Europe/London</option></select></label>
+          <label>Locale<select value={settings.organization.workspace.locale} disabled={!canManageOrganization} onChange={(event) => updateWorkspace('locale', event.target.value)}><option value="en-US">English (US)</option><option value="en-IN">English (India)</option><option value="en-GB">English (UK)</option></select></label>
+          <label>Currency<select value={settings.organization.workspace.currency} disabled={!canManageOrganization} onChange={(event) => updateWorkspace('currency', event.target.value)}><option value="USD">USD</option><option value="INR">INR</option><option value="GBP">GBP</option><option value="EUR">EUR</option></select></label>
+        </div>
+        {!canManageOrganization && <p className="settingsHint">Organization controls are read-only for your role.</p>}
+      </section>
+
+      <section className="card settingsSection">
+        <div className="settingsTitle"><Bell size={18} /><div><h2>Notifications</h2><p>Choose how HRFlow keeps you informed.</p></div></div>
+        <div className="settingsToggles">
+          <label><span><b>In-app notifications</b><small>Show workflow updates in the notification center.</small></span><input type="checkbox" checked={settings.preferences.inAppNotifications} onChange={(event) => update('preferences', 'inAppNotifications', event.target.checked)} /></label>
+          <label><span><b>Email notifications</b><small>Send important approvals and reminders by email.</small></span><input type="checkbox" checked={settings.preferences.emailNotifications} onChange={(event) => update('preferences', 'emailNotifications', event.target.checked)} /></label>
+          <label><span><b>Weekly digest</b><small>Receive a weekly workforce summary.</small></span><input type="checkbox" checked={settings.preferences.weeklyDigest} onChange={(event) => update('preferences', 'weeklyDigest', event.target.checked)} /></label>
+          <label className="themePreference"><span><b>Theme preference</b><small>Applied on your next session.</small></span><select value={settings.preferences.theme} onChange={(event) => update('preferences', 'theme', event.target.value)}><option value="SYSTEM">System</option><option value="LIGHT">Light</option><option value="DARK">Dark</option></select></label>
+        </div>
+      </section>
+
+      <section className="card settingsSection">
+        <div className="settingsTitle"><Bot size={18} /><div><h2>AI configuration</h2><p>Control how Gemini uses organization context.</p></div></div>
+        <div className="settingsToggles">
+          <label><span><b>Enable AI features</b><small>Resume analysis, ranking, analytics, and Copilot.</small></span><input type="checkbox" disabled={!canManageOrganization} checked={settings.ai.enabled} onChange={(event) => update('ai', 'enabled', event.target.checked)} /></label>
+          <label><span><b>Cache AI responses</b><small>Improve repeat-response speed and control usage.</small></span><input type="checkbox" disabled={!canManageOrganization} checked={settings.ai.cacheEnabled} onChange={(event) => update('ai', 'cacheEnabled', event.target.checked)} /></label>
+          <label><span><b>Allow payroll context</b><small>Permit Copilot to use aggregated payroll figures.</small></span><input type="checkbox" disabled={!canManageOrganization} checked={settings.ai.payrollContext} onChange={(event) => update('ai', 'payrollContext', event.target.checked)} /></label>
+        </div>
+      </section>
+
+      <section className="card settingsSection">
+        <div className="settingsTitle"><Activity size={18} /><div><h2>Service readiness</h2><p>Configuration status without exposing credentials.</p></div></div>
+        <div className="serviceRows">
+          <div><span>Email delivery</span><strong className={settings.services.emailConfigured ? 'serviceReady' : 'servicePending'}>{settings.services.emailConfigured ? 'Configured' : 'Needs setup'}</strong></div>
+          <div><span>Error monitoring</span><strong className={settings.services.monitoringConfigured ? 'serviceReady' : 'servicePending'}>{settings.services.monitoringConfigured ? 'Configured' : 'Needs setup'}</strong></div>
+          <div><span>Organization isolation</span><strong className="serviceReady">Active</strong></div>
+        </div>
+      </section>
+    </form>
+  </>
+}
+
+function ModulePage({ type, rows = [], openAction, setActive, refresh, role, profile }) {
   const [title, description] = moduleCopy[type] || [type === 'notifications' ? 'Notifications' : 'Settings', type === 'notifications' ? 'Review alerts and activity across your workspace.' : 'Manage organization access, security, and integrations.']
   const Icon = navGroups.flatMap((group) => group.items).find((item) => item.id === type)?.icon || (type === 'notifications' ? Bell : Settings)
   const [analysis, setAnalysis] = useState('')
@@ -903,16 +1040,7 @@ function ModulePage({ type, rows = [], openAction, setActive, refresh, role }) {
   }
 
   if (type === 'settings') {
-    return <>
-      <PageHeading title="Settings" description={description}>
-        {role === 'HR_MANAGER' && <button className="button primary" onClick={() => openAction('invitation', 'Invite team member')}><UserPlus size={16} /> Invite member</button>}
-      </PageHeading>
-      <div className="moduleGrid">
-        <div className="card moduleCard"><span>Authentication</span><strong>Firebase</strong><p>Email/password and Google authentication</p></div>
-        <div className="card moduleCard"><span>Tenant security</span><strong>RLS</strong><p>Organization-scoped database policies</p></div>
-        <div className="card moduleCard"><span>AI service</span><strong>Gemini</strong><p>Cached, rate-limited, and audited</p></div>
-      </div>
-    </>
+    return <SettingsPage role={role} refresh={refresh} openAction={openAction} />
   }
 
   return <>
@@ -1103,6 +1231,15 @@ export default function Home() {
   const liveData = useHrflowData(active)
   const profile = liveData.session?.profile
   const role = profile?.role || 'EMPLOYEE'
+
+  useEffect(() => {
+    const preference = profile?.preferences?.theme
+    if (preference === 'DARK') setDark(true)
+    else if (preference === 'LIGHT') setDark(false)
+    else if (preference === 'SYSTEM') {
+      setDark(window.matchMedia('(prefers-color-scheme: dark)').matches)
+    }
+  }, [profile?.preferences?.theme])
   const canManage = role === 'HR_MANAGER'
   const canRecruit = role === 'HR_MANAGER' || role === 'RECRUITER'
   const badges = {
