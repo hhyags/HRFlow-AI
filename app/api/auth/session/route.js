@@ -105,7 +105,10 @@ export async function POST(request) {
     return setSessionCookie(response, sessionCookie)
   } catch (error) {
     const message = error.code?.startsWith('auth/') ? 'Invalid or expired Firebase token' : error.message
-    return NextResponse.json({ error: message }, { status: 401 })
+    const safeMessage = error.code?.startsWith('auth/')
+      ? message
+      : 'Unable to create a secure session. Contact the HRFlow administrator.'
+    return NextResponse.json({ error: safeMessage }, { status: 401 })
   }
 }
 
