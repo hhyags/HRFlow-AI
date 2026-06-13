@@ -39,6 +39,14 @@ test('HR Manager dashboard and module navigation remain functional', async ({ pa
   await expect(page.getByRole('button', { name: 'Run payroll' })).toBeVisible()
   await page.getByRole('button', { name: 'Leave' }).click()
   await expect(page.getByRole('button', { name: 'Approve' }).first()).toBeVisible()
+  await page.getByRole('button', { name: 'Settings' }).click()
+  await expect(page.getByRole('heading', { name: 'Settings', exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Service readiness' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Roles & permissions' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Account security' })).toBeVisible()
+  expect((await page.request.get('/api/settings')).status()).toBe(200)
+  await page.getByRole('button', { name: 'Save changes' }).click()
+  await expect(page.getByRole('status')).toContainText('Settings saved successfully.')
 })
 
 test('Recruiter can access recruitment but cannot manage employees', async ({ page }) => {
