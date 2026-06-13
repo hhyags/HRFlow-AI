@@ -938,11 +938,6 @@ function SettingsPage({ role, refresh, openAction }) {
       <button className="button primary" type="submit" form="settings-form" disabled={busy}>{busy ? 'Saving...' : 'Save changes'}</button>
     </PageHeading>
     {message && <div className="card actionResult" role="status"><Activity size={17} /><p>{message}</p><button className="iconButton" onClick={() => setMessage('')} aria-label="Dismiss message"><X size={15} /></button></div>}
-    <div className="moduleGrid">
-      <div className="card moduleCard"><span>Authentication</span><strong>{settings.services.authentication}</strong><p>Email/password and Google authentication</p></div>
-      <div className="card moduleCard"><span>Tenant security</span><strong>RLS</strong><p>{settings.services.databaseSecurity} organization isolation</p></div>
-      <div className="card moduleCard"><span>AI service</span><strong>Gemini</strong><p>{settings.services.aiModel}, cached and audited</p></div>
-    </div>
     <form id="settings-form" className="settingsLayout" onSubmit={save}>
       <section className="card settingsSection">
         <div className="settingsTitle"><Users size={18} /><div><h2>Profile</h2><p>Your personal workspace identity.</p></div></div>
